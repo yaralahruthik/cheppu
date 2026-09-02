@@ -1,0 +1,21 @@
+spike/docs/try-it.md
+  s_c3e2dad88bf6f7::t_0ed009719053ab 1-149
+spike/README.md
+  s_c3e2dad88bf6f7::t_cfe28ee6d92ca2 80-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "66d2060f7a6c28fd47a18750d0f2843afd2d49ff",
+  "prompts": {},
+  "sessions": {
+    "s_c3e2dad88bf6f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9257f86-d9bb-4289-be71-4fe398ceeb3c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
