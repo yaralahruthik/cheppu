@@ -1,0 +1,27 @@
+.gitignore
+  s_26f8227f9eadec::t_37dc743b630d5e 1
+AGENTS.md
+  s_26f8227f9eadec::t_0b01282d76abe0 1-15
+docs/agents/domain.md
+  s_26f8227f9eadec::t_15bd0673e1dadd 1-51
+docs/agents/issue-tracker.md
+  s_26f8227f9eadec::t_aa06cafece4492 1-49
+docs/agents/triage-labels.md
+  s_26f8227f9eadec::t_a0f4a58b6a428a 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "c19bc0204967b10030b3dbc3d7be8389c1ea575c",
+  "prompts": {},
+  "sessions": {
+    "s_26f8227f9eadec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17931064-bf4f-4d0e-a37a-9ddd745ff0d2",
+        "model": "unknown"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
