@@ -1,0 +1,28 @@
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_ea97039259ef0b::t_8da057ff42c007 5-15,21-23,31-40,46,50,53,61-62,65-67,70-71,77-87,95,97,99-104,112,114,118-131,139,156,159,172,174
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_ea97039259ef0b::t_3ebf8166c77595 6-16,43-44,54,89,102-110,127-133,152-166,177
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_ea97039259ef0b::t_a09fec1345c108 22-23,27,30-36,45-46,60,82-89,106-108
+  s_ea97039259ef0b::t_dff8bb8c265e93 109-110
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_ea97039259ef0b::t_91a0647eb8becd 11,48-58,116,121-122
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_ea97039259ef0b::t_a09fec1345c108 13-18,51-57,59-61,64-75,78-87,99-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "216e17365e036535c4b41eebdc6a922e1b22a37e",
+  "prompts": {},
+  "sessions": {
+    "s_ea97039259ef0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e39b808-dd85-4127-a864-2ede09c691cc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
