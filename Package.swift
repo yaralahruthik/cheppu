@@ -5,21 +5,41 @@ import PackageDescription
 let package = Package(
     name: "Cheppu",
     platforms: [.macOS(.v15)],
+    dependencies: [
+        // Parakeet TDT v3 on CoreML, per ADR-0001. Reached only by CheppuEngine.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6")
+    ],
     targets: [
         // The headless core. `Scripts/check-core-is-headless.sh` keeps it from
         // reaching an OS framework, which is what keeps its suite runnable with
         // nothing granted, downloaded or plugged in.
         .target(name: "CheppuCore"),
 
+        // The Engine: the Parakeet model, the download that puts it on the
+        // machine, and nothing else. A target of its own rather than part of the
+        // app so that the download can be tested without launching a menu bar.
+        .target(
+            name: "CheppuEngine",
+            dependencies: [
+                "CheppuCore",
+                .product(name: "FluidAudio", package: "FluidAudio"),
+            ]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
-            dependencies: ["CheppuCore"]
+            dependencies: ["CheppuCore", "CheppuEngine"]
         ),
 
         .testTarget(
             name: "CheppuCoreTests",
             dependencies: ["CheppuCore"]
+        ),
+
+        .testTarget(
+            name: "CheppuEngineTests",
+            dependencies: ["CheppuEngine"]
         ),
     ],
     swiftLanguageModes: [.v6]
