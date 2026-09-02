@@ -1,7 +1,3 @@
-> **Note:** this directory is not yet a git repository and has no GitHub remote.
-> `gh` infers the repo from `git remote -v`, so run `git init` and add a GitHub
-> remote before these commands will work.
-
 # Issue tracker: GitHub
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
