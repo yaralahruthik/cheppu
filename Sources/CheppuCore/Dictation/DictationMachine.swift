@@ -19,13 +19,21 @@ public enum DictationState: Equatable, Sendable {
 /// Something that happened to a Dictation.
 ///
 /// Some come from the user by way of the Hotkey port; the rest are a port
-/// reporting back what it was asked to do. Cancel, Discard, the Cap, and the
-/// failure of an Insertion arrive with their own tickets.
+/// reporting back what it was asked to do. Cancel, Discard and the Cap arrive
+/// with their own tickets.
 public enum DictationEvent: Equatable, Sendable {
     case activationStarted
     case activationStopped
+    case audioCaptured(CapturedAudio)
     case rawTranscriptReceived(RawTranscript)
     case insertionSucceeded
+
+    /// A port could not do what it was asked.
+    ///
+    /// Which port, and what the user is told about it, is the Clipboard Fallback
+    /// ticket's. All this event settles is that a Dictation always has a way
+    /// back to Idle, so a failure costs the user one Dictation and not the app.
+    case dictationFailed
 }
 
 /// Something the machine has decided should happen.
@@ -34,11 +42,8 @@ public enum DictationEvent: Equatable, Sendable {
 /// turns one into a call on a port.
 public enum DictationEffect: Equatable, Sendable {
     case startCapturing
-
-    /// Ends capture and hands what was captured to the Engine. One effect
-    /// because it is one job — get the words that were spoken.
-    case stopCapturingAndTranscribe
-
+    case stopCapturing
+    case transcribe(CapturedAudio)
     case playCue(Cue)
     case showPill(PillState)
     case hidePill
@@ -52,7 +57,7 @@ public enum DictationEffect: Equatable, Sendable {
 /// no pasteboard. That is what makes every rule about how a Dictation behaves
 /// assertable as a list of effects, in order, with nothing granted or installed.
 public struct DictationMachine: Sendable {
-    public private(set) var state: DictationState
+    private(set) var state: DictationState
 
     public init() {
         self.state = .idle
@@ -74,9 +79,14 @@ public struct DictationMachine: Sendable {
 
         case (.listening, .activationStopped):
             state = .transcribing
-            // The Pill says "transcribing" before the Engine is asked, so the
-            // pause that follows is never mistaken for a hang.
-            return [.playCue(.dictationStopped), .showPill(.transcribing), .stopCapturingAndTranscribe]
+            // The microphone closes first, so the stop Cue is not one of the
+            // sounds the Engine is later asked to transcribe. The Pill says
+            // "transcribing" before the Engine is asked, so the pause that
+            // follows is never mistaken for a hang.
+            return [.stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing)]
+
+        case (.transcribing, .audioCaptured(let audio)):
+            return [.transcribe(audio)]
 
         case (.transcribing, .rawTranscriptReceived(let transcript)):
             // Cleanup stands between the Raw Transcript and the Final Text from
@@ -91,6 +101,11 @@ public struct DictationMachine: Sendable {
             state = .idle
             // The text appearing is the signal that it worked, so the Pill's
             // last job is to get out of the way.
+            return [.hidePill]
+
+        case (.listening, .dictationFailed), (.transcribing, .dictationFailed),
+            (.inserting, .dictationFailed):
+            state = .idle
             return [.hidePill]
 
         default:

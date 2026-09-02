@@ -8,7 +8,7 @@ struct FakeHotkey: HotkeyPort {
     func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async {}
 }
 
-/// Audio capture that hands back a canned recording without a microphone.
+/// Audio capture that hands back canned audio without a microphone.
 struct FakeAudioCapture: AudioCapturePort {
     let journal: PortJournal
     let captured: CapturedAudio
@@ -42,6 +42,17 @@ struct FakeInsertion: InsertionPort {
 
     func insert(_ finalText: FinalText) async throws {
         await journal.record(.inserted(finalText))
+    }
+}
+
+/// An Insertion that will not go through, whatever the reason. What the user is
+/// told about it is the Clipboard Fallback ticket's; all this fake is for is
+/// showing that a Dictation which fails still ends.
+struct RefusingInsertion: InsertionPort {
+    struct Refused: Error {}
+
+    func insert(_ finalText: FinalText) async throws {
+        throw Refused()
     }
 }
 
@@ -102,13 +113,13 @@ actor FakeClock: ClockPort {
     }
 
     func advance(by duration: Duration) {
-        reading += duration.seconds
+        reading += duration.asTimeInterval
     }
 }
 
 extension Duration {
-    /// This Duration as the seconds `Date` counts in.
-    var seconds: TimeInterval {
+    /// This Duration in the seconds `Date` counts in.
+    var asTimeInterval: TimeInterval {
         TimeInterval(components.seconds) + TimeInterval(components.attoseconds) * 1e-18
     }
 }

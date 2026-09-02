@@ -3,6 +3,17 @@ import Testing
 
 @testable import CheppuCore
 
+extension [PortJournal.Call] {
+    /// Whether one port was called before another. False when either call is
+    /// missing, so an assertion built on it fails rather than passes vacuously.
+    func calls(_ first: PortJournal.Call, before second: PortJournal.Call) -> Bool {
+        guard let earlier = firstIndex(of: first), let later = firstIndex(of: second) else {
+            return false
+        }
+        return earlier < later
+    }
+}
+
 // These tests drive the core the way the user drives it — a tap, then another
 // tap — and read back what its ports were told. Nothing here looks inside the
 // core, loads a model, opens a microphone, or waits for a clock.
@@ -29,7 +40,8 @@ struct DictationCoreTests {
         init(
             hears: RawTranscript = DictationCoreTests.heardWords,
             captures: CapturedAudio = DictationCoreTests.spokenAudio,
-            now: Date = DictationCoreTests.aTuesdayAfternoon
+            now: Date = DictationCoreTests.aTuesdayAfternoon,
+            insertionRefuses: Bool = false
         ) {
             let journal = PortJournal()
             let clock = FakeClock(reading: now)
@@ -39,7 +51,7 @@ struct DictationCoreTests {
                 hotkey: FakeHotkey(),
                 audio: FakeAudioCapture(journal: journal, captured: captures),
                 engine: FakeEngine(journal: journal, transcript: hears),
-                insertion: FakeInsertion(journal: journal),
+                insertion: insertionRefuses ? RefusingInsertion() : FakeInsertion(journal: journal),
                 clipboard: FakeClipboard(),
                 history: FakeHistory(journal: journal),
                 feedback: FakeFeedback(journal: journal),
@@ -74,9 +86,9 @@ struct DictationCoreTests {
                 .capturingStarted,
                 .cuePlayed(.dictationStarted),
                 .pillShown(.listening),
+                .capturingStopped,
                 .cuePlayed(.dictationStopped),
                 .pillShown(.transcribing),
-                .capturingStopped,
                 .transcribed(Self.spokenAudio),
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
@@ -85,6 +97,15 @@ struct DictationCoreTests {
                 .pillHidden,
             ]
         )
+    }
+
+    @Test("The microphone is closed before the stop Cue plays, so the Cue is not in what is transcribed")
+    func theMicrophoneIsClosedBeforeTheStopCuePlays() async throws {
+        let scenario = Scenario()
+
+        try await scenario.toggleADictation()
+
+        #expect(await scenario.journal.calls.calls(.capturingStopped, before: .cuePlayed(.dictationStopped)))
     }
 
     @Test("The audio the Dictation captured is the audio the Engine was given")
@@ -103,12 +124,14 @@ struct DictationCoreTests {
 
         try await scenario.toggleADictation()
 
-        let calls = await scenario.journal.calls
-        let recorded = try #require(
-            calls.firstIndex { if case .appendedToHistory = $0 { true } else { false } }
+        #expect(
+            await scenario.journal.calls.calls(
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
+                ),
+                before: .inserted(FinalText("hello there"))
+            )
         )
-        let inserted = try #require(calls.firstIndex(of: .inserted(FinalText("hello there"))))
-        #expect(recorded < inserted)
     }
 
     @Test("A History entry is stamped with what the Clock reads at the time")
@@ -126,6 +149,21 @@ struct DictationCoreTests {
         #expect(stamps == [Self.aTuesdayAfternoon, Self.aTuesdayAfternoon.addingTimeInterval(90)])
     }
 
+    @Test("A Dictation whose Insertion fails still ends, so the next tap is not met with a dead app")
+    func aDictationWhoseInsertionFailsStillEnds() async throws {
+        let scenario = Scenario(insertionRefuses: true)
+
+        await #expect(throws: RefusingInsertion.Refused.self) {
+            try await scenario.toggleADictation()
+        }
+
+        #expect(await scenario.journal.calls.last == .pillHidden)
+
+        try await scenario.core.receive(.activationStarted)
+        let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
+        #expect(timesCaptureOpened == 2)
+    }
+
     @Test("Stopping a Dictation that was never started touches nothing")
     func stoppingADictationThatWasNeverStartedTouchesNothing() async throws {
         let scenario = Scenario()
@@ -136,7 +174,7 @@ struct DictationCoreTests {
     }
 
     @Test("A second Toggle Activation runs the same course as the first")
-    func aSecondDictationRunsTheSameCourseAsTheFirst() async throws {
+    func aSecondToggleActivationRunsTheSameCourseAsTheFirst() async throws {
         let scenario = Scenario()
 
         try await scenario.toggleADictation()
