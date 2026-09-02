@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The Engine's repository, answering from memory instead of over the network.
@@ -33,6 +34,16 @@ final class FakeRepository: @unchecked Sendable {
     /// the download being killed partway.
     var dropsAfter: Int?
 
+    /// Sends this many bytes of every body and then goes quiet without ever
+    /// finishing or failing, standing in for a server that has stopped
+    /// answering. Only a cancellation ends a transfer against this.
+    var stallsAfter: Int?
+
+    /// Answers with the right number of bytes and the wrong ones, standing in
+    /// for a mirror or a proxy serving something that is not what the
+    /// repository published.
+    var corruptsBodies = false
+
     init() {
         host = "https://repository-\(UUID().uuidString.lowercased())"
         FakeRepositoryProtocol.register(self, for: host)
@@ -65,14 +76,26 @@ final class FakeRepository: @unchecked Sendable {
 
     // MARK: - What the protocol asks of us
 
-    /// The repository's file listing, in the shape the Hugging Face API answers.
+    /// The repository's file listing, in the shape the Hugging Face API answers
+    /// — including the Git LFS digest, which really is the SHA-256 of the file's
+    /// contents.
     fileprivate func listing() -> Data {
         let entries = lock.withLock {
-            files.keys.sorted().map { path in
-                ["type": "file", "path": path, "size": files[path]!.count] as [String: Any]
+            files.keys.sorted().map { path -> [String: Any] in
+                let body = files[path]!
+                return [
+                    "type": "file",
+                    "path": path,
+                    "size": body.count,
+                    "lfs": ["oid": Self.digest(of: body)],
+                ]
             }
         }
         return try! JSONSerialization.data(withJSONObject: entries)
+    }
+
+    static func digest(of body: Data) -> String {
+        SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The answer to one file request: a status, the bytes, and whether they
@@ -82,8 +105,9 @@ final class FakeRepository: @unchecked Sendable {
             asks.append(Ask(path: path, range: range))
             guard let whole = files[path] else { return nil }
 
+            let served = corruptsBodies ? Data(whole.map { $0 &+ 1 }) : whole
             let from = (honoursRange ? range?.offset : nil) ?? 0
-            let body = whole.count >= from ? Data(whole.suffix(from: from)) : Data()
+            let body = served.count >= from ? Data(served.suffix(from: from)) : Data()
             return (from > 0 ? 206 : 200, body)
         }
     }
@@ -153,7 +177,7 @@ final class FakeRepositoryProtocol: URLProtocol, @unchecked Sendable {
         }
         finish(
             status: answer.status, body: answer.body, for: url,
-            droppingAfter: repository.dropsAfter)
+            droppingAfter: repository.dropsAfter, stallingAfter: repository.stallsAfter)
     }
 
     override func stopLoading() {}
@@ -166,11 +190,16 @@ final class FakeRepositoryProtocol: URLProtocol, @unchecked Sendable {
     /// and that is exactly what the resume is built on.
     private static let wire = DispatchQueue(label: "cheppu.fake-repository")
 
-    private func finish(status: Int, body: Data, for url: URL, droppingAfter: Int? = nil) {
+    private func finish(
+        status: Int, body: Data, for url: URL, droppingAfter: Int? = nil, stallingAfter: Int? = nil
+    ) {
         let response = HTTPURLResponse(
             url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
-        let sending = droppingAfter.map { body.prefix($0) } ?? body[...]
-        let dropped = sending.count < body.count
+        let cutoff = droppingAfter ?? stallingAfter
+        let sending = cutoff.map { body.prefix($0) } ?? body[...]
+        let cut = sending.count < body.count
+        let dropped = droppingAfter != nil && cut
+        let stalled = stallingAfter != nil && cut
 
         Self.wire.async { [weak self] in
             guard let self else { return }
@@ -187,6 +216,7 @@ final class FakeRepositoryProtocol: URLProtocol, @unchecked Sendable {
                 usleep(200)
             }
 
+            if stalled { return }
             if dropped {
                 self.client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
             } else {

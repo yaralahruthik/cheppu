@@ -52,18 +52,12 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
     // MARK: - Putting the Engine on the machine
 
     public func isEngineDownloaded() async -> Bool {
-        // Read from disk against the names FluidAudio will open, so that the
-        // ordinary launch — the Engine is already here — asks the network
-        // nothing.
-        let vocabulary = directory.appending(path: EngineFiles.vocabulary)
-        guard FileManager.default.fileExists(atPath: vocabulary.path) else { return false }
-
-        return EngineFiles.bundles.allSatisfy { bundle in
-            var isDirectory: ObjCBool = false
-            let exists = FileManager.default.fileExists(
-                atPath: directory.appending(path: bundle).path, isDirectory: &isDirectory)
-            return exists && isDirectory.boolValue
-        }
+        // Answered from what the last finished download recorded, on disk, so
+        // that the ordinary launch — the Engine is already here — asks the
+        // network nothing. Checking the directory's shape instead would call an
+        // interrupted download finished: a bundle's folder is made before the
+        // first byte of it arrives.
+        EngineDownload.isEngineComplete(in: directory)
     }
 
     public func downloadEngine(

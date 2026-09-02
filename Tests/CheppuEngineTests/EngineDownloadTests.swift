@@ -55,6 +55,10 @@ struct EngineDownloadTests {
             try? Data(contentsOf: directory.appending(path: path))
         }
 
+        func isEngineComplete() async -> Bool {
+            EngineDownload.isEngineComplete(in: directory)
+        }
+
         func cleanUp() {
             try? FileManager.default.removeItem(at: directory)
         }
@@ -264,6 +268,129 @@ struct EngineDownloadTests {
 
         #expect(scenario.repository.everythingAsked.first { $0.path == path }?.range == nil)
         #expect(scenario.onDisk(path) == scenario.repository.body(of: path))
+    }
+
+    @Test("A download cancelled mid-transfer stops rather than hanging")
+    func aDownloadCancelledMidTransferStopsRatherThanHanging() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        // The repository goes quiet partway through a file, so the only thing
+        // that can end this transfer is the cancellation — which is what happens
+        // when someone closes Onboarding while it is downloading.
+        scenario.repository.stallsAfter = 100
+        let running = Task { try await scenario.run(scenario.download()) }
+
+        // The first file is smaller than the stall point and finishes; the
+        // second is the one left hanging, and the one the cancel has to reach.
+        while scenario.repository.everythingAsked.count < 2 {
+            await Task.yield()
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        running.cancel()
+
+        #expect(await finishes(running), "a cancelled download never returned")
+    }
+
+    /// Whether a task is done inside a few seconds, rather than never.
+    private func finishes(_ task: Task<some Sendable, some Error>) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                _ = await task.result
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+    }
+
+    @Test("A download killed as its last byte lands is not fetched all over again")
+    func aDownloadKilledAsItsLastByteLandsIsNotFetchedAllOverAgain() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        // A `.partial` holding the whole file is a download killed in the moment
+        // between the last byte landing and the file being given its name. What
+        // it needs is the name — asking for 445 MB again would be the opposite
+        // of resuming from where it stopped.
+        let path = "\(EngineFiles.bundles.sorted()[0])/model.mil"
+        let destination = scenario.directory.appending(path: path)
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try scenario.repository.body(of: path)
+            .write(to: destination.appendingPathExtension("partial"))
+
+        try await scenario.run(scenario.download())
+
+        #expect(!scenario.repository.everythingAsked.contains { $0.path == path })
+        #expect(scenario.onDisk(path) == scenario.repository.body(of: path))
+    }
+
+    @Test("A resumed download opens where it stopped rather than at nothing")
+    func aResumedDownloadOpensWhereItStoppedRatherThanAtNothing() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        scenario.repository.dropsAfter = 1_000
+        _ = try? await scenario.run(scenario.download())
+
+        scenario.repository.dropsAfter = nil
+        let reports = try await scenario.run(scenario.download())
+
+        // A bar that restarts at zero on every attempt tells the user their
+        // last attempt bought them nothing, which is the opposite of true.
+        #expect((reports.first?.downloadedBytes ?? 0) > 0)
+    }
+
+    @Test("Progress never goes backwards, even when a resume is answered with the whole file")
+    func progressNeverGoesBackwardsEvenWhenAResumeIsAnsweredWithTheWholeFile() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        scenario.repository.dropsAfter = 1_000
+        _ = try? await scenario.run(scenario.download())
+
+        scenario.repository.dropsAfter = nil
+        scenario.repository.honoursRange = false
+        let reports = try await scenario.run(scenario.download(reportEvery: 1))
+
+        let bytes = reports.map(\.downloadedBytes)
+        #expect(bytes == bytes.sorted())
+    }
+
+    @Test("A file whose bytes are not the bytes that were published is refused")
+    func aFileWhoseBytesAreNotTheBytesThatWerePublishedIsRefused() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        // Cheppu runs these bytes as a model. The right length is not enough:
+        // a proxy or a mirror that serves something else of the same size must
+        // not be able to put it where the Engine will load it from.
+        scenario.repository.corruptsBodies = true
+
+        await #expect(throws: (any Error).self) {
+            try await scenario.run(scenario.download())
+        }
+        #expect(await scenario.isEngineComplete() == false)
+    }
+
+    @Test("An Engine is only complete once a download has finished recording it")
+    func anEngineIsOnlyCompleteOnceADownloadHasFinishedRecordingIt() async throws {
+        let scenario = Scenario()
+        defer { scenario.cleanUp() }
+
+        scenario.repository.dropsAfter = 1_000
+        _ = try? await scenario.run(scenario.download())
+        #expect(await scenario.isEngineComplete() == false)
+
+        scenario.repository.dropsAfter = nil
+        try await scenario.run(scenario.download())
+        #expect(await scenario.isEngineComplete())
     }
 
     @Test("A repository that has stopped publishing the Engine says so")

@@ -8,7 +8,9 @@ import Testing
 // What the Engine does before it has anything to run: what it says when the
 // model is not on the machine, and what it does not do about that. Transcribing
 // for real needs 480 MB of Parakeet, which is why it is not asserted here.
-@Suite("Parakeet Engine")
+// `ModelHub.offlineMode` is FluidAudio's own global, so the tests that read it
+// run one at a time rather than alongside each other.
+@Suite("Parakeet Engine", .serialized)
 struct ParakeetEngineTests {
     private static func engine(in directory: URL) -> ParakeetEngine {
         ParakeetEngine(directory: directory, configuration: .ephemeral)
@@ -21,14 +23,24 @@ struct ParakeetEngineTests {
         return directory
     }
 
-    /// Puts the shape of a downloaded Engine on disk: the bundles as directories
-    /// and the vocabulary as a file.
-    private static func fakeADownloadedEngine(in directory: URL) throws {
-        for bundle in EngineFiles.bundles {
+    /// Puts a finished Engine on disk: a file inside each bundle, the
+    /// vocabulary, and the manifest a finished download leaves behind.
+    @discardableResult
+    private static func fakeADownloadedEngine(in directory: URL) throws -> [String] {
+        let paths = EngineFiles.bundles.sorted().map { "\($0)/model.mil" } + [EngineFiles.vocabulary]
+        let body = Data(repeating: 3, count: 128)
+
+        for path in paths {
+            let file = directory.appending(path: path)
             try FileManager.default.createDirectory(
-                at: directory.appending(path: bundle), withIntermediateDirectories: true)
+                at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try body.write(to: file)
         }
-        try Data().write(to: directory.appending(path: EngineFiles.vocabulary))
+
+        let recorded = paths.map { #"{"path":"\#($0)","bytes":\#(body.count)}"# }
+        try Data("[\(recorded.joined(separator: ","))]".utf8)
+            .write(to: directory.appending(path: EngineDownload.manifestName))
+        return paths
     }
 
     @Test("Making the Engine takes FluidAudio's own network path away")
@@ -62,12 +74,39 @@ struct ParakeetEngineTests {
         #expect(await Self.engine(in: directory).isEngineDownloaded())
     }
 
-    @Test("An Engine missing its vocabulary is not ready")
-    func anEngineMissingItsVocabularyIsNotReady() async throws {
+    @Test("An Engine missing one of its files is not ready")
+    func anEngineMissingOneOfItsFilesIsNotReady() async throws {
         let directory = Self.emptyDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         try Self.fakeADownloadedEngine(in: directory)
         try FileManager.default.removeItem(at: directory.appending(path: EngineFiles.vocabulary))
+
+        #expect(await Self.engine(in: directory).isEngineDownloaded() == false)
+    }
+
+    @Test("An Engine whose folders exist but whose files never arrived is not ready")
+    func anEngineWhoseFoldersExistButWhoseFilesNeverArrivedIsNotReady() async throws {
+        let directory = Self.emptyDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        // What an interrupted download leaves: every bundle's folder made, and
+        // nothing inside it. Reading the directory's shape would call this
+        // finished and then fail confusingly on the first Dictation.
+        for bundle in EngineFiles.bundles {
+            try FileManager.default.createDirectory(
+                at: directory.appending(path: bundle), withIntermediateDirectories: true)
+        }
+        try Data().write(to: directory.appending(path: EngineFiles.vocabulary))
+
+        #expect(await Self.engine(in: directory).isEngineDownloaded() == false)
+    }
+
+    @Test("An Engine whose files are short of what was recorded is not ready")
+    func anEngineWhoseFilesAreShortOfWhatWasRecordedIsNotReady() async throws {
+        let directory = Self.emptyDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = try Self.fakeADownloadedEngine(in: directory)
+        try Data(repeating: 3, count: 8).write(to: directory.appending(path: paths[0]))
 
         #expect(await Self.engine(in: directory).isEngineDownloaded() == false)
     }

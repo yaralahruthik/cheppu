@@ -15,9 +15,9 @@ let package = Package(
         // nothing granted, downloaded or plugged in.
         .target(name: "CheppuCore"),
 
-        // The Engine: the Parakeet model, the download that puts it on the
-        // machine, and nothing else. A target of its own rather than part of the
-        // app so that the download can be tested without launching a menu bar.
+        // The Engine: Parakeet, the download that puts it on the machine, and
+        // nothing else. A target of its own rather than part of the app so that
+        // the download can be tested without launching a menu bar.
         .target(
             name: "CheppuEngine",
             dependencies: [

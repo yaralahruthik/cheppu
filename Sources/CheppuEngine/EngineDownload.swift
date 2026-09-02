@@ -1,4 +1,5 @@
 import CheppuCore
+import CryptoKit
 import Foundation
 
 /// The Engine Download: every outbound byte Cheppu sends, in one file.
@@ -13,9 +14,15 @@ import Foundation
 /// anything that opens a connection appears anywhere else.
 struct EngineDownload {
     /// One file of the Engine, as the repository describes it.
-    struct RemoteFile: Equatable, Sendable {
+    struct RemoteFile: Equatable, Sendable, Codable {
         let path: String
         let bytes: Int64
+
+        /// The SHA-256 of the file's contents, where the repository publishes
+        /// one. Everything large is stored through Git LFS, which is what makes
+        /// a digest available for exactly the files whose corruption would
+        /// matter — the weights Cheppu goes on to run as a model.
+        var digest: String?
     }
 
     enum Failure: Error, Equatable {
@@ -26,9 +33,13 @@ struct EngineDownload {
         /// What arrived was not the size the repository said it would be, which
         /// means a truncated body, or an error page wearing a file's name.
         case wrongSize(path: String, expected: Int64, received: Int64)
+        /// What arrived was the right length and the wrong bytes.
+        case wrongContents(path: String)
         /// The repository listed none of the Engine's files, so the names Cheppu
         /// asks for and the names it publishes have drifted apart.
         case engineNotInRepository
+        /// A path the repository listed cannot be turned into an address.
+        case unusableAddress(String)
     }
 
     /// Where the Engine is being assembled.
@@ -44,11 +55,6 @@ struct EngineDownload {
     /// Where the Engine is published.
     var host = "https://huggingface.co"
 
-    /// The revision fetched. `main` rather than a pinned commit: the Engine's
-    /// publisher reissues these bundles to fix conversion bugs, and a pin would
-    /// hold Cheppu on a known-worse Engine until someone edited a constant.
-    var revision = "main"
-
     /// How much has to arrive between two reports.
     ///
     /// The network hands over chunks of a few tens of kilobytes, which across
@@ -56,6 +62,15 @@ struct EngineDownload {
     /// progress bar can draw and coarse enough that the caller is never the
     /// thing holding the download up.
     var reportEvery: Int64 = 1_000_000
+
+    /// The revision fetched. `main` rather than a pinned commit: the Engine's
+    /// publisher reissues these bundles to fix conversion bugs, and a pin would
+    /// hold Cheppu on a known-worse Engine until someone edited a constant.
+    private static let revision = "main"
+
+    /// What the last finished download left behind, so that "is the Engine
+    /// here" can be answered later without asking the repository again.
+    static let manifestName = ".cheppu-engine.json"
 
     /// Asks the repository what the Engine is made of and what it weighs.
     ///
@@ -65,9 +80,7 @@ struct EngineDownload {
         let session = URLSession(configuration: configuration)
         defer { session.finishTasksAndInvalidate() }
 
-        let repository = EngineFiles.repository.remotePath
-        let listing = URL(string: "\(host)/api/models/\(repository)/tree/\(revision)?recursive=1")!
-
+        let listing = try address("api/models/\(repository)/tree/\(Self.revision)?recursive=1")
         let (data, response) = try await session.data(from: listing)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw Failure.listingRefused(status: status) }
@@ -76,11 +89,33 @@ struct EngineDownload {
             try JSONDecoder()
             .decode([TreeEntry].self, from: data)
             .filter { $0.type == "file" && EngineFiles.isEngineFile($0.path) }
-            .map { RemoteFile(path: $0.path, bytes: $0.size ?? 0) }
+            .map { RemoteFile(path: $0.path, bytes: $0.size ?? 0, digest: $0.lfs?.oid) }
             .sorted { $0.path < $1.path }
 
         guard !files.isEmpty else { throw Failure.engineNotInRepository }
         return files
+    }
+
+    /// Whether a finished download left every one of its files here, at the size
+    /// it recorded.
+    ///
+    /// Read from the manifest the last finished download wrote rather than from
+    /// the directory's shape, because an interrupted download leaves that shape
+    /// behind too: a bundle's directory is made before the first byte of it
+    /// arrives, so "the folders are all there" is true of a download that got
+    /// nowhere.
+    static func isEngineComplete(in directory: URL) -> Bool {
+        guard let recorded = manifest(in: directory), !recorded.isEmpty else { return false }
+        return recorded.allSatisfy {
+            bytesOnDisk(at: directory.appending(path: $0.path)) == $0.bytes
+        }
+    }
+
+    static func manifest(in directory: URL) -> [RemoteFile]? {
+        guard let data = try? Data(contentsOf: directory.appending(path: manifestName)) else {
+            return nil
+        }
+        return try? JSONDecoder().decode([RemoteFile].self, from: data)
     }
 
     /// Fetches whatever is missing, reporting as it goes.
@@ -89,18 +124,20 @@ struct EngineDownload {
     /// half-finished is asked for from the byte it stopped at. That is the whole
     /// of the resume: part-fetched bytes wait next to where they are going under
     /// a `.partial` suffix, and a file takes its real name only once all of it
-    /// has arrived. Nothing half-written can therefore be mistaken for a
-    /// finished file, whenever the process died.
+    /// has arrived and been checked. Nothing half-written can therefore be
+    /// mistaken for a finished file, whenever the process died.
     func run(reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void) async throws {
         let files = try await filesOnOffer()
         let total = files.reduce(0) { $0 + $1.bytes }
+        let report = RisingProgress(total: total, reporting: progress)
 
-        let transfers = EngineTransfers()
-        let session = URLSession(configuration: configuration, delegate: transfers, delegateQueue: nil)
-        defer { session.finishTasksAndInvalidate() }
+        let transfers = EngineTransfers(configuration: configuration)
+        defer { transfers.close() }
 
+        // Opens at what an interrupted attempt already left, so a resumed
+        // download picks the bar up where it stopped rather than at zero.
         var settled: Int64 = 0
-        progress(EngineDownloadProgress(downloadedBytes: 0, totalBytes: total))
+        report(bytesAlreadyHere(of: files))
 
         for file in files {
             try Task.checkCancellation()
@@ -111,13 +148,27 @@ struct EngineDownload {
                 // reads a fixed base rather than a variable being mutated
                 // alongside it.
                 let base = settled
-                try await fetch(file, to: destination, over: session, through: transfers) { onDisk in
-                    progress(EngineDownloadProgress(downloadedBytes: base + onDisk, totalBytes: total))
+                try await fetch(file, to: destination, through: transfers) { onDisk in
+                    report(base + onDisk)
                 }
             }
 
             settled += file.bytes
-            progress(EngineDownloadProgress(downloadedBytes: settled, totalBytes: total))
+            report(settled)
+        }
+
+        try Data(JSONEncoder().encode(files))
+            .write(to: directory.appending(path: Self.manifestName), options: .atomic)
+    }
+
+    /// How much of the Engine is on the machine before anything is fetched,
+    /// counting both finished files and what an interrupted attempt left.
+    private func bytesAlreadyHere(of files: [RemoteFile]) -> Int64 {
+        files.reduce(0) { total, file in
+            let destination = directory.appending(path: file.path)
+            let landed = Self.bytesOnDisk(at: destination)
+            let partial = Self.bytesOnDisk(at: destination.appendingPathExtension("partial"))
+            return total + min(max(landed, partial), file.bytes)
         }
     }
 
@@ -125,7 +176,6 @@ struct EngineDownload {
     private func fetch(
         _ file: RemoteFile,
         to destination: URL,
-        over session: URLSession,
         through transfers: EngineTransfers,
         reporting onDisk: @escaping @Sendable (Int64) -> Void
     ) async throws {
@@ -133,40 +183,69 @@ struct EngineDownload {
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
 
         let partial = destination.appendingPathExtension("partial")
+        var resumeFrom = Self.bytesOnDisk(at: partial)
 
-        // More on disk than the repository says the file holds means the leftover
-        // belongs to an older version of the file, so it is dropped rather than
-        // continued. This is also what stops a repository that keeps answering
-        // with the wrong length: each attempt appends, and once the leftover
-        // overshoots, the next one starts clean rather than resuming forever.
-        if Self.bytesOnDisk(at: partial) >= file.bytes {
+        if resumeFrom > file.bytes {
+            // A leftover longer than the file it is going to belongs to an older
+            // version of it, so it is started over. Dropping it is also what
+            // stops a repository that keeps answering with the wrong length from
+            // being resumed forever: each attempt appends, and once the leftover
+            // overshoots, the next one starts clean.
             try? FileManager.default.removeItem(at: partial)
+            resumeFrom = 0
         }
 
-        let encoded = file.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file.path
-        let repository = EngineFiles.repository.remotePath
-        var request = URLRequest(url: URL(string: "\(host)/\(repository)/resolve/\(revision)/\(encoded)")!)
+        // A `.partial` that is already the full length is a download killed
+        // between its last byte landing and the file being given its name. What
+        // it needs is its name, not 445 MB fetched again.
+        if resumeFrom < file.bytes {
+            var request = URLRequest(
+                url: try address("\(repository)/resolve/\(Self.revision)/\(encoded(file.path))"))
+            if resumeFrom > 0 {
+                request.setValue("bytes=\(resumeFrom)-", forHTTPHeaderField: "Range")
+            }
 
-        let alreadyHave = Self.bytesOnDisk(at: partial)
-        if alreadyHave > 0 {
-            request.setValue("bytes=\(alreadyHave)-", forHTTPHeaderField: "Range")
+            do {
+                try await transfers.run(
+                    request, appendingTo: partial, reportEvery: reportEvery, reporting: onDisk)
+            } catch let refusal as EngineTransfers.Refused {
+                throw Failure.fileRefused(path: file.path, status: refusal.status)
+            }
         }
 
-        do {
-            try await transfers.run(
-                request, over: session, appendingTo: partial,
-                reportEvery: reportEvery, reporting: onDisk)
-        } catch let refusal as EngineTransfers.Refused {
-            throw Failure.fileRefused(path: file.path, status: refusal.status)
-        }
+        try verify(file, at: partial)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: partial, to: destination)
+    }
 
+    /// Checks that what arrived is what was published, before it is given the
+    /// name the Engine will load it by.
+    private func verify(_ file: RemoteFile, at partial: URL) throws {
         let received = Self.bytesOnDisk(at: partial)
         guard received == file.bytes else {
             throw Failure.wrongSize(path: file.path, expected: file.bytes, received: received)
         }
 
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: partial, to: destination)
+        // Cheppu goes on to run these bytes as a model, so where the repository
+        // publishes a digest, the length agreeing is not enough. Wrong contents
+        // are dropped rather than resumed: there is no byte to carry on from
+        // when the ones already here are the wrong ones.
+        guard let digest = file.digest else { return }
+        guard try Self.sha256(of: partial) == digest else {
+            try? FileManager.default.removeItem(at: partial)
+            throw Failure.wrongContents(path: file.path)
+        }
+    }
+
+    private static func sha256(of url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     static func bytesOnDisk(at url: URL) -> Int64 {
@@ -176,13 +255,58 @@ struct EngineDownload {
         return size.int64Value
     }
 
+    private var repository: String { EngineFiles.repository.remotePath }
+
+    private func encoded(_ path: String) -> String {
+        path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+    }
+
+    /// An address inside the repository — or a throw, rather than a crash. This
+    /// is the one file that builds URLs out of what a server said.
+    private func address(_ suffix: String) throws -> URL {
+        guard let url = URL(string: "\(host)/\(suffix)") else {
+            throw Failure.unusableAddress(suffix)
+        }
+        return url
+    }
+
     /// One entry of the repository's file listing. Sizes come already resolved
     /// through Git LFS, so a pointer file's 134 bytes are never mistaken for the
     /// 445 MB of weights it stands for.
     private struct TreeEntry: Decodable {
+        struct LargeFile: Decodable {
+            let oid: String
+        }
         let type: String
         let path: String
         let size: Int64?
+        let lfs: LargeFile?
+    }
+}
+
+/// A progress report that only ever moves forwards.
+///
+/// A server is entitled to answer a resumed request with the whole file, which
+/// takes that file's count back to zero partway through a download. The bytes
+/// are honest; a bar that jumps backwards is not, and it costs more trust than
+/// the precision is worth.
+private final class RisingProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private var highest: Int64 = 0
+    private let total: Int64
+    private let report: @Sendable (EngineDownloadProgress) -> Void
+
+    init(total: Int64, reporting report: @escaping @Sendable (EngineDownloadProgress) -> Void) {
+        self.total = total
+        self.report = report
+    }
+
+    func callAsFunction(_ downloaded: Int64) {
+        let rising = lock.withLock { () -> Int64 in
+            highest = max(highest, downloaded)
+            return highest
+        }
+        report(EngineDownloadProgress(downloadedBytes: rising, totalBytes: total))
     }
 }
 
@@ -194,8 +318,9 @@ struct EngineDownload {
 /// chunks the network delivered it in.
 ///
 /// Every callback below arrives on the session's own serial delegate queue, and
-/// the state they share is touched nowhere else. That is what the unchecked
-/// conformance asserts.
+/// so does everything else that touches a transfer — starting it, cancelling it,
+/// and waiting on it. That is what the unchecked conformance asserts, and it is
+/// why none of the three can race the others.
 final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     /// The repository answered a file request with something other than a body.
     /// Which file it was belongs to the caller, which knows the path.
@@ -203,10 +328,8 @@ final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendab
         let status: Int
     }
 
-    /// One file on its way to disk.
-    ///
-    /// Handed to the delegate queue once and read only from the callbacks that
-    /// run there, which is the same serialisation the enclosing class relies on.
+    /// One file on its way to disk. Handed to the delegate queue once, and
+    /// touched only from there.
     private final class InFlight: @unchecked Sendable {
         let handle: FileHandle
         let report: @Sendable (Int64) -> Void
@@ -214,7 +337,9 @@ final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendab
         var onDisk: Int64
         var reportedAt: Int64
         var failure: Error?
-        var waiting: CheckedContinuation<Void, Error>?
+
+        private var waiting: CheckedContinuation<Void, Error>?
+        private var ended: Result<Void, Error>?
 
         init(
             handle: FileHandle, onDisk: Int64, reportEvery: Int64,
@@ -226,14 +351,53 @@ final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendab
             self.onDisk = onDisk
             self.reportedAt = onDisk
         }
+
+        /// The transfer is over: told to whoever is waiting, or kept until
+        /// someone is. A cancellation can end a transfer in the moment between
+        /// it being started and there being anything to tell, and an outcome
+        /// dropped there would leave the caller waiting on a reply that was
+        /// never coming.
+        func finish(_ outcome: Result<Void, Error>) {
+            if let waiting {
+                self.waiting = nil
+                waiting.resume(with: outcome)
+            } else {
+                ended = outcome
+            }
+        }
+
+        /// Start waiting — unless it is already over.
+        func wait(_ continuation: CheckedContinuation<Void, Error>) {
+            if let ended {
+                continuation.resume(with: ended)
+            } else {
+                waiting = continuation
+            }
+        }
     }
 
+    /// Implicitly unwrapped because a session that reports to this object cannot
+    /// be made until the object exists, and the object is useless without one.
+    private var session: URLSession!
     private var inFlight: [Int: InFlight] = [:]
+
+    init(configuration: URLSessionConfiguration) {
+        // Serial, and the one queue a transfer is ever touched from.
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        super.init()
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
+    }
+
+    /// The session holds this delegate until it is invalidated, so letting go of
+    /// the transfers is not enough to let go of either.
+    func close() {
+        session.finishTasksAndInvalidate()
+    }
 
     /// Runs one request, appending what comes back to `partial`.
     func run(
         _ request: URLRequest,
-        over session: URLSession,
         appendingTo partial: URL,
         reportEvery: Int64,
         reporting report: @escaping @Sendable (Int64) -> Void
@@ -248,19 +412,27 @@ final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendab
         let task = session.dataTask(with: request)
         let transfer = InFlight(
             handle: handle, onDisk: alreadyOnDisk, reportEvery: reportEvery, report: report)
+        let queue = session.delegateQueue
+
+        // Registered and started on the queue the callbacks arrive on, so the
+        // first of them cannot land before there is anything for it to find.
+        await withCheckedContinuation { started in
+            queue.addOperation {
+                self.inFlight[task.taskIdentifier] = transfer
+                task.resume()
+                started.resume()
+            }
+        }
 
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                // Registered on the delegate's own queue so the first callback
-                // cannot arrive before there is anything for it to find.
-                session.delegateQueue.addOperation {
-                    transfer.waiting = continuation
-                    self.inFlight[task.taskIdentifier] = transfer
-                    task.resume()
-                }
+            try await withCheckedThrowingContinuation { continuation in
+                queue.addOperation { transfer.wait(continuation) }
             }
         } onCancel: {
-            task.cancel()
+            // Through the same queue as everything else, so a cancellation
+            // arriving while the transfer is still being set up joins the order
+            // rather than racing it.
+            queue.addOperation { task.cancel() }
         }
     }
 
@@ -316,14 +488,12 @@ final class EngineTransfers: NSObject, URLSessionDataDelegate, @unchecked Sendab
 
         // A refused body cancels the task, so the transport error that follows
         // says only that it was cancelled. The refusal is what the caller needs.
-        let waiting = transfer.waiting
-        transfer.waiting = nil
         if let failure = transfer.failure {
-            waiting?.resume(throwing: failure)
+            transfer.finish(.failure(failure))
         } else if let error {
-            waiting?.resume(throwing: error)
+            transfer.finish(.failure(error))
         } else {
-            waiting?.resume()
+            transfer.finish(.success(()))
         }
     }
 }
