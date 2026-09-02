@@ -1,0 +1,38 @@
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_ea97039259ef0b::t_8321410eed93b7 1-97
+Tests/CheppuCoreTests/Fakes/PortJournal.swift
+  s_ea97039259ef0b::t_a10768c3e1ad4a 1-29
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_ea97039259ef0b::t_a10768c3e1ad4a 1-114
+Sources/CheppuCore/Dictation/Dictation.swift
+  s_ea97039259ef0b::t_cf45c480709f00 52-55
+  s_ea97039259ef0b::t_b153430dc34d01 1-51,56-90
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_ea97039259ef0b::t_cf45c480709f00 54
+  s_ea97039259ef0b::t_8321410eed93b7 1-53,55-100
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_ea97039259ef0b::t_cf45c480709f00 36-37,68
+  s_ea97039259ef0b::t_e5b0083707d8d9 1-35,38-67,69-132
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_ea97039259ef0b::t_118487b98d190a 107-109,111,138
+  s_ea97039259ef0b::t_4758a481ef4c07 1-62,64-81,83,85-106,112-137,139-144,146-148
+  s_ea97039259ef0b::t_cf45c480709f00 63,82,84,110,145
+Sources/CheppuCore/Ports/Ports.swift
+  s_ea97039259ef0b::t_02d189fa812be5 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "6c127a3f0bb4829a4508a15819fff85358e554b4",
+  "prompts": {},
+  "sessions": {
+    "s_ea97039259ef0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e39b808-dd85-4127-a864-2ede09c691cc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
