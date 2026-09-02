@@ -63,6 +63,19 @@ Cheppu asks for two permissions, each with a one-line reason at the moment it is
 
 Choosing the Fn/Globe key as your hotkey adds one more, Input Monitoring, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing". Cheppu explains both at the moment you choose that key, not before.
 
+## Building
+
+Cheppu is a Swift package. `CheppuCore` is the headless core — it decides what happens and imports no OS framework — and `Cheppu` is the menu bar app that performs what the core decides.
+
+```sh
+swift build                     # build the core and the app
+swift test                      # run the core suite
+./Scripts/make-app.sh           # assemble dist/Cheppu.app
+./Scripts/check-core-is-headless.sh
+```
+
+The core suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
+
 ## Status
 
 Pre-alpha. The product is being designed in the open before code is written. See [`CONTEXT.md`](./CONTEXT.md) for the project vocabulary, [`docs/adr/`](./docs/adr/) for the decisions and their reasons, and [`docs/product-experience.md`](./docs/product-experience.md) for what we think a good dictation app has to get right.

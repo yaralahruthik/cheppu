@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build the app and run the core suite
+    # Apple Silicon, matching the only hardware Cheppu supports.
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report the toolchain
+        run: |
+          swift --version
+          xcode-select --print-path
+
+      - name: Core is headless
+        run: ./Scripts/check-core-is-headless.sh
+
+      - name: Core suite
+        run: swift test
+
+      - name: Build the app
+        run: ./Scripts/make-app.sh
+
+      - name: The app is a menu bar app
+        run: test "$(plutil -extract LSUIElement raw dist/Cheppu.app/Contents/Info.plist)" = "true"
