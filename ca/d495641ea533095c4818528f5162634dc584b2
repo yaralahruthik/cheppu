@@ -1,0 +1,45 @@
+Tests/CheppuCoreTests/MenuBarMenuTests.swift
+  s_b6618c6d74a133::t_6c10d78ac54be8 1-25
+Scripts/check-core-is-headless.sh
+  s_b6618c6d74a133::t_8b27f60d375c13 1-16
+Sources/Cheppu/CheppuApp.swift
+  s_b6618c6d74a133::t_7ccb19bf775f65 16
+  s_b6618c6d74a133::t_4be2c90f0c12ff 1-11,17-18,20-23
+  s_b6618c6d74a133::t_987a0f6da90d99 12-15,19
+Scripts/make-app.sh
+  s_b6618c6d74a133::t_8b27f60d375c13 1-26
+Sources/CheppuCore/MenuBarMenu.swift
+  s_b6618c6d74a133::t_ee1f8a71f1aeec 6
+  s_b6618c6d74a133::t_1547bc2181eee6 1-5,7-35
+Sources/Cheppu/MenuBarController.swift
+  s_b6618c6d74a133::t_7ccb19bf775f65 8,27,37
+  s_b6618c6d74a133::t_4be2c90f0c12ff 1-7,9-26,28-36,38-44
+.github/workflows/ci.yml
+  s_b6618c6d74a133::t_06cc0f647ce4c1 1-37
+Package.swift
+  s_b6618c6d74a133::t_6c10d78ac54be8 1-28
+App/Info.plist
+  s_b6618c6d74a133::t_8b27f60d375c13 1-29
+docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md
+  s_b6618c6d74a133::t_06cc0f647ce4c1 1-21
+.gitignore
+  s_b6618c6d74a133::t_963a57e7367f67 2-4
+README.md
+  s_b6618c6d74a133::t_963a57e7367f67 66-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "cad495641ea533095c4818528f5162634dc584b2",
+  "prompts": {},
+  "sessions": {
+    "s_b6618c6d74a133": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "35f0cc32-c757-42c9-844a-379986c7e536",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
