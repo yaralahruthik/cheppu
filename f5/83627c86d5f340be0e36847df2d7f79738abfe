@@ -1,0 +1,21 @@
+Sources/Cheppu/MenuBarController.swift
+  s_be6c4c189a9938::t_0c8024c4a8f1b7 14
+Sources/Cheppu/MenuBarIcon.swift
+  s_be6c4c189a9938::t_97e21667bac3ee 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "f583627c86d5f340be0e36847df2d7f79738abfe",
+  "prompts": {},
+  "sessions": {
+    "s_be6c4c189a9938": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0842318-b1ed-404a-8d7d-48b4ee19f406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
