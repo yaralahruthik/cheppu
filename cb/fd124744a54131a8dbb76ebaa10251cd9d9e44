@@ -1,0 +1,35 @@
+docs/adr/0002-transcribe-after-stop-not-while-speaking.md
+  s_ed89f6816459d4::t_143c65178504ed 1-13
+CONTEXT.md
+  s_ed89f6816459d4::t_143c65178504ed 49-68,86-89
+  s_ed89f6816459d4::t_6a5b9b1258cce0 26
+  s_ed89f6816459d4::t_f50b0790e8c097 1-25,27-48,69,71-85
+  s_ed89f6816459d4::t_90aee37aa735a3 70
+docs/product-experience.md
+  s_ed89f6816459d4::t_87efcdf2597b77 1-48,50-83
+  s_ed89f6816459d4::t_6a5b9b1258cce0 49
+docs/adr/0001-parakeet-as-the-sole-mvp-engine.md
+  s_ed89f6816459d4::t_f50b0790e8c097 1-10,12-19
+  s_ed89f6816459d4::t_90aee37aa735a3 11
+README.md
+  s_ed89f6816459d4::t_143c65178504ed 23,30-31,36-37,83
+  s_ed89f6816459d4::t_6a5b9b1258cce0 18,38,59,62-64
+  s_ed89f6816459d4::t_87efcdf2597b77 1-17,19-22,24-29,32-33,39-58,60-61,65-68,80-82
+  s_ed89f6816459d4::t_90aee37aa735a3 34-35,69-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "cbfd124744a54131a8dbb76ebaa10251cd9d9e44",
+  "prompts": {},
+  "sessions": {
+    "s_ed89f6816459d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4851d9d1-2dd7-46f5-bb00-b10f6bfe9e4e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
