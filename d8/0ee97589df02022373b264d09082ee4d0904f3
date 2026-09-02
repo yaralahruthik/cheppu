@@ -1,0 +1,19 @@
+docs/adr/0004-a-permanent-bundle-identifier-not-tied-to-a-domain.md
+  s_be6c4c189a9938::t_9d5c985091ddb3 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "d80ee97589df02022373b264d09082ee4d0904f3",
+  "prompts": {},
+  "sessions": {
+    "s_be6c4c189a9938": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0842318-b1ed-404a-8d7d-48b4ee19f406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
