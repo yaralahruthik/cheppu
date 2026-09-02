@@ -11,10 +11,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(
-            systemSymbolName: "waveform",
-            accessibilityDescription: "Cheppu"
-        )
+        statusItem.button?.image = MenuBarIcon.image()
         statusItem.menu = menu(for: MenuBarMenu())
         self.statusItem = statusItem
     }
