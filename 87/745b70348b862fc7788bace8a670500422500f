@@ -1,0 +1,65 @@
+README.md
+  s_ef0465c043f4a2::t_6646bfbb41c49a 68,71-72,75,78-86
+Sources/CheppuCore/Ports/Ports.swift
+  s_ef0465c043f4a2::t_fd1cb1613a8a4f 49-77
+CONTEXT.md
+  s_ef0465c043f4a2::t_4cb41c4144c212 33-36
+Sources/CheppuEngine/ParakeetEngine.swift
+  s_ef0465c043f4a2::t_0b35a9b64f250e 27-29,36
+  s_ef0465c043f4a2::t_704d98c5a4a3e4 1-26,30-35,37-133
+Tests/CheppuEngineTests/ParakeetEngineTests.swift
+  s_ef0465c043f4a2::t_b3b9aa1217eed6 1-89
+Tests/CheppuCoreTests/EngineDownloadProgressTests.swift
+  s_ef0465c043f4a2::t_e5cf94ac023557 1-34
+.github/workflows/ci.yml
+  s_ef0465c043f4a2::t_1a1cc9a948d9b0 27-31
+Tests/CheppuEngineTests/Fakes/FakeRepository.swift
+  s_ef0465c043f4a2::t_432bbd5483aa8b 161-168,173-188,190-194
+  s_ef0465c043f4a2::t_164e4684748fe8 1-31,34-85,88-153,157-160,170-171,195-197
+  s_ef0465c043f4a2::t_0b5cc02a5bc953 32-33,86-87,154-156,169,172,189
+docs/adr/0005-cheppu-fetches-the-engine-itself.md
+  s_ef0465c043f4a2::t_26ffeaf208bce7 1-27
+Package.resolved
+  s_ef0465c043f4a2::t_b90b50d420af3c 1-15
+Sources/CheppuEngine/EngineFiles.swift
+  s_ef0465c043f4a2::t_a25c8a641a540c 1-66
+Sources/CheppuEngine/EngineDownload.swift
+  s_ef0465c043f4a2::t_1d446724e2bd84 1-9,11-12,14-26,28,31-37,39-44,46-47,50-55,58-61,64-67,70-87,95-109,114,116-129,131-137,143-146,150-154,162-172,177-196,206,211-237,240-244,246-249,256-277,279,281-282,286-288,291-316,321,323,325,327-329
+  s_ef0465c043f4a2::t_4390b9bfd1f113 10,13,27,29-30,38,45,48-49,56-57,62-63,68-69,88-94,110-113,115,130,142,147-149,155-161,173-176,197-205,238-239,245,250-255,278,280,283-285,289-290,317-320,322,324,326
+  s_ef0465c043f4a2::t_146ee0d803c6df 138-141
+  s_ef0465c043f4a2::t_dbb4374445532b 207-210
+Package.swift
+  s_ef0465c043f4a2::t_b90b50d420af3c 8-11,18-28,32,39-43
+Scripts/check-the-download-is-the-only-network-path.sh
+  s_ef0465c043f4a2::t_2bfa8be938c841 1-34
+Tests/CheppuEngineTests/LiveEngineTests.swift
+  s_ef0465c043f4a2::t_3cddc3cb0225d5 108
+  s_ef0465c043f4a2::t_01c48bca4d0c47 114
+  s_ef0465c043f4a2::t_7a4f9018628329 120-123
+  s_ef0465c043f4a2::t_aeeb09cc5243f7 42,45-46,49-51,54
+  s_ef0465c043f4a2::t_8e307f2bccdde5 1-41,43-44,47-48,52-53,55-74,76-107,109-113,115-119,124-129,131-141
+  s_ef0465c043f4a2::t_ff7b36e57f01c9 75,130
+Tests/CheppuEngineTests/EngineDownloadTests.swift
+  s_ef0465c043f4a2::t_10b50605931d74 179,201,235
+  s_ef0465c043f4a2::t_4f856f3f2c269e 182-184,188-190,192
+  s_ef0465c043f4a2::t_1ab4a15dbf68e4 1-178,180-181,185-187,191,193-200,202-234,236-244,267-286
+  s_ef0465c043f4a2::t_b7c31a73c907b7 245-266
+Sources/CheppuCore/Engine/EngineDownloadProgress.swift
+  s_ef0465c043f4a2::t_cca9330dbe5627 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "87745b70348b862fc7788bace8a670500422500f",
+  "prompts": {},
+  "sessions": {
+    "s_ef0465c043f4a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a545e1e-1802-488e-8df2-edc92293fa3d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
