@@ -1,0 +1,69 @@
+spike/tauri/src-tauri/src/engine.rs
+  s_c3e2dad88bf6f7::t_ac97bf682494c8 1-52
+spike/docs/try-it.md
+  s_c3e2dad88bf6f7::t_ca1f303b105e54 27-31,84-85,87,91-103,136-143
+spike/README.md
+  s_c3e2dad88bf6f7::t_a871be7c3d4167 47-54
+spike/swift/Package.swift
+  s_c3e2dad88bf6f7::t_35b1d7808fc896 18
+  s_c3e2dad88bf6f7::t_3c4bbcab2b28a5 12,19,21-24
+  s_c3e2dad88bf6f7::t_69bc5663755453 13-17
+spike/swift/Package.resolved
+  s_c3e2dad88bf6f7::t_615d79d20e3c8a 2,9-10
+  s_c3e2dad88bf6f7::t_14c46420364987 1,3-8,11,13-14
+spike/TRACE.md
+  s_c3e2dad88bf6f7::t_3b8c6583791749 40-41,48-49,63-64,67-93
+spike/swift/Sources/SteelThread/Pill.swift
+  s_c3e2dad88bf6f7::t_14c46420364987 16-19,25
+spike/swift/Sources/SteelThread/Engine.swift
+  s_c3e2dad88bf6f7::t_3c4bbcab2b28a5 1-37,43-44,47-48
+  s_c3e2dad88bf6f7::t_adf0261726be76 45
+  s_c3e2dad88bf6f7::t_14c46420364987 49-55
+  s_c3e2dad88bf6f7::t_84cbfb3ce1e888 38-42,46
+spike/tauri/src-tauri/Cargo.toml
+  s_c3e2dad88bf6f7::t_3474be0d4a47a6 20
+spike/tauri/src-tauri/src/resample.rs
+  s_c3e2dad88bf6f7::t_10cc2154b7d1b3 104-114
+  s_c3e2dad88bf6f7::t_ac97bf682494c8 1-103,115-116
+spike/tauri/src-tauri/src/pill.rs
+  s_c3e2dad88bf6f7::t_f641fc863ef251 29-32,40
+spike/docs/runbook.md
+  s_c3e2dad88bf6f7::t_a871be7c3d4167 96-105
+spike/tauri/src-tauri/src/dictation.rs
+  s_c3e2dad88bf6f7::t_f641fc863ef251 11,27,40,45-57,105-108,110-113,116-121
+spike/docs/findings.md
+  s_c3e2dad88bf6f7::t_c1c108e5fd3955 22-23
+  s_c3e2dad88bf6f7::t_c57a21bb0d1c2e 24,50-52,109,111-113,115-121,123-161,174-180
+spike/tauri/src-tauri/src/audio.rs
+  s_c3e2dad88bf6f7::t_f641fc863ef251 11-16,24-32,96-97,118-123,129-133
+spike/swift/Sources/SteelThread/main.swift
+  s_c3e2dad88bf6f7::t_14c46420364987 56-59
+spike/swift/Sources/SteelThread/Audio.swift
+  s_c3e2dad88bf6f7::t_c7cdcd9bac5b44 4-5,7-10,12-14,16-17,38-52,54,57-58,62,73,89,95-107,115-122,124-132
+  s_c3e2dad88bf6f7::t_84cbfb3ce1e888 108-114,123
+spike/swift/Sources/SteelThread/Dictation.swift
+  s_c3e2dad88bf6f7::t_14c46420364987 18,25-34,76-79,81,84-89
+spike/docs/parakeet-in-rust.md
+  s_c3e2dad88bf6f7::t_f3694e5b82ba47 7-57,61,63-65,67-74,76,78-79,81-84,86-96,100-110,114,116
+spike/tauri/src-tauri/src/main.rs
+  s_c3e2dad88bf6f7::t_f641fc863ef251 8,12,47-49
+  s_c3e2dad88bf6f7::t_e98a1ed2d58113 50
+spike/tauri/src-tauri/Cargo.lock
+  s_c3e2dad88bf6f7::t_6cc3494267b0a0 866-874,3121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "c7eeac9f513141f7723f024b9e272f0bf15d56a1",
+  "prompts": {},
+  "sessions": {
+    "s_c3e2dad88bf6f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9257f86-d9bb-4289-be71-4fe398ceeb3c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
