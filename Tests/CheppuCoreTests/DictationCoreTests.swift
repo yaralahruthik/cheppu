@@ -35,6 +35,7 @@ struct DictationCoreTests {
     private struct Scenario {
         let journal: PortJournal
         let clock: FakeClock
+        let hotkey: FakeHotkey
         let core: DictationCore
 
         init(
@@ -42,14 +43,17 @@ struct DictationCoreTests {
             captures: CapturedAudio = DictationCoreTests.spokenAudio,
             hearsLevels: [InputLevel] = [],
             now: Date = DictationCoreTests.aTuesdayAfternoon,
-            insertionRefuses: Bool = false
+            insertionRefuses: Bool = false,
+            isAccessibilityGranted: Bool = true
         ) {
             let journal = PortJournal()
             let clock = FakeClock(reading: now)
+            let hotkey = FakeHotkey(isAccessibilityGranted: isAccessibilityGranted)
             self.journal = journal
             self.clock = clock
+            self.hotkey = hotkey
             self.core = DictationCore(
-                hotkey: FakeHotkey(),
+                hotkey: hotkey,
                 audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
                 insertion: insertionRefuses ? RefusingInsertion() : FakeInsertion(journal: journal),
@@ -62,9 +66,69 @@ struct DictationCoreTests {
 
         /// Taps the Hotkey, speaks, and taps it again.
         func toggleADictation() async throws {
-            try await core.receive(.activationStarted)
-            try await core.receive(.activationStopped)
+            try await core.receive(.activationToggled)
+            try await core.receive(.activationToggled)
         }
+
+        /// The same Dictation, driven from the keyboard rather than through the
+        /// core's own door.
+        func toggleADictationWithTheHotkey() async throws {
+            try await core.watchForActivations()
+            await hotkey.tap()
+            await hotkey.tap()
+        }
+    }
+
+    @Test("A tap of the Hotkey runs a Dictation, and the next tap ends it")
+    func aTapOfTheHotkeyRunsADictationAndTheNextTapEndsIt() async throws {
+        let scenario = Scenario()
+
+        try await scenario.toggleADictationWithTheHotkey()
+
+        // The whole Dictation, set off by two taps of a key pressed in whatever
+        // app the user was already working in.
+        #expect(
+            await scenario.journal.calls == [
+                .capturingStarted,
+                .cuePlayed(.dictationStarted),
+                .pillShown(.listening(.silent)),
+                .capturingStopped,
+                .cuePlayed(.dictationStopped),
+                .pillShown(.transcribing),
+                .transcribed(Self.spokenAudio),
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
+                ),
+                .inserted(FinalText("hello there")),
+                .pillHidden,
+            ]
+        )
+    }
+
+    @Test("Without Accessibility, watching for Activations says so rather than silently doing nothing")
+    func withoutAccessibilityWatchingForActivationsSaysSo() async throws {
+        let scenario = Scenario(isAccessibilityGranted: false)
+
+        await #expect(throws: HotkeyFailure.accessibilityDenied) {
+            try await scenario.core.watchForActivations()
+        }
+
+        // And nothing is left half-watching behind the refusal.
+        #expect(await !scenario.hotkey.isBeingWatched)
+    }
+
+    @Test("Nothing watches the keyboard until it is asked to")
+    func nothingWatchesTheKeyboardUntilItIsAskedTo() async throws {
+        let scenario = Scenario()
+
+        // Building the core does not start a tap. Watching is something the app
+        // does once it is running, and it is the moment Accessibility is
+        // wanted.
+        #expect(await !scenario.hotkey.isBeingWatched)
+
+        try await scenario.core.watchForActivations()
+
+        #expect(await scenario.hotkey.isBeingWatched)
     }
 
     @Test("A Toggle Activation puts the words where the cursor is")
@@ -160,7 +224,7 @@ struct DictationCoreTests {
 
         #expect(await scenario.journal.calls.last == .pillHidden)
 
-        try await scenario.core.receive(.activationStarted)
+        try await scenario.core.receive(.activationToggled)
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
     }

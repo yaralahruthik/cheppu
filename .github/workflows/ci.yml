@@ -30,8 +30,12 @@ jobs:
       - name: No audio reaches the disk
         run: ./Scripts/check-no-audio-reaches-the-disk.sh
 
-      # No Engine downloaded, no model and no microphone on this runner: the
-      # suite has to be green all the same, which is the whole point of the ports.
+      - name: The Hotkey never swallows a keystroke
+        run: ./Scripts/check-the-hotkey-never-swallows-a-keystroke.sh
+
+      # No Engine downloaded, no model, no microphone and nothing granted on
+      # this runner: the suite has to be green all the same, which is the whole
+      # point of the ports.
       - name: Core suite
         run: swift test
 

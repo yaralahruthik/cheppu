@@ -45,6 +45,37 @@ public actor DictationCore {
         self.clock = clock
     }
 
+    /// Starts watching for Activations, so that a tap of the Hotkey runs a
+    /// Dictation while any other app has focus.
+    ///
+    /// Throwing means the Hotkey cannot be watched —
+    /// `HotkeyFailure.accessibilityDenied` — which the app says out loud rather
+    /// than leaving the user with a key that does nothing.
+    ///
+    /// The app cannot call this yet, because a core needs an Insertion for a
+    /// Dictation to end in and that is #7. Until then it watches the Hotkey
+    /// itself, for the Accessibility half of this, and the suite is what drives
+    /// a Dictation from a tap.
+    public func watchForActivations() async throws {
+        try await hotkey.observe { [weak self] gesture in
+            await self?.activated(by: gesture)
+        }
+    }
+
+    /// Takes a gesture from whoever is watching the keyboard.
+    ///
+    /// It does not throw where `receive(_:)` does, for the same reason `hear(_:)`
+    /// does not: the keyboard has nowhere to put an error it was handed back
+    /// between two Dictations, and the tap that failed is already over. What
+    /// the user is told about a Dictation that failed is the Clipboard Fallback
+    /// ticket's.
+    private func activated(by gesture: HotkeyEvent) async {
+        switch gesture {
+        case .tapped:
+            try? await receive(.activationToggled)
+        }
+    }
+
     /// The one door into a Dictation.
     ///
     /// Runs the event through the machine, performs what it asks for, and keeps

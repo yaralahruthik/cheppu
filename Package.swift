@@ -36,10 +36,21 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // The keyboard: the one place Cheppu watches keys it was not sent and
+        // the one place it asks for Accessibility. A target of its own rather
+        // than part of the app so that what counts as the Hotkey — and what
+        // Cheppu does about a key it was not meant to see — is testable with
+        // nothing granted and no event tap anywhere near the machine running
+        // the suite.
+        .target(
+            name: "CheppuKeyboard",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
-            dependencies: ["CheppuCore", "CheppuEngine", "CheppuAudio"]
+            dependencies: ["CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard"]
         ),
 
         .testTarget(
@@ -55,6 +66,11 @@ let package = Package(
         .testTarget(
             name: "CheppuAudioTests",
             dependencies: ["CheppuAudio"]
+        ),
+
+        .testTarget(
+            name: "CheppuKeyboardTests",
+            dependencies: ["CheppuKeyboard"]
         ),
     ],
     swiftLanguageModes: [.v6]

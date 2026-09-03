@@ -24,6 +24,16 @@ public enum DictationState: Equatable, Sendable {
 public enum DictationEvent: Equatable, Sendable {
     case activationStarted
     case activationStopped
+
+    /// The Hotkey was tapped, which is a Toggle: it starts a Dictation when
+    /// none is running and stops the one that is.
+    ///
+    /// One event rather than two because only the machine knows which of the
+    /// two a tap means. A keyboard that decided for itself would have to keep a
+    /// copy of whether a Dictation is running, and every way a Dictation ends
+    /// without the Hotkey — the Cap, a Cancel, a failure — would leave that
+    /// copy wrong and the next tap doing the opposite of what the user meant.
+    case activationToggled
     case audioCaptured(CapturedAudio)
     case inputLevelChanged(InputLevel)
     case rawTranscriptReceived(RawTranscript)
@@ -72,13 +82,13 @@ public struct DictationMachine: Sendable {
     /// able to derail a Dictation.
     public mutating func receive(_ event: DictationEvent) -> [DictationEffect] {
         switch (state, event) {
-        case (.idle, .activationStarted):
+        case (.idle, .activationStarted), (.idle, .activationToggled):
             state = .listening
             // Capture opens before the Cue plays: the sound is feedback, but a
             // word spoken before the microphone is open is gone.
             return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent))]
 
-        case (.listening, .activationStopped):
+        case (.listening, .activationStopped), (.listening, .activationToggled):
             state = .transcribing
             // The microphone closes first, so the stop Cue is not one of the
             // sounds the Engine is later asked to transcribe. The Pill says
