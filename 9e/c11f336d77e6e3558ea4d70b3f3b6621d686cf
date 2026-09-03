@@ -1,0 +1,21 @@
+Tests/CheppuEngineTests/Fakes/FakeRepository.swift
+  s_7043cd469080d3::t_7dc4b6ca282bb1 42-53,192-193,207-208,212
+Tests/CheppuEngineTests/EngineDownloadTests.swift
+  s_7043cd469080d3::t_7dc4b6ca282bb1 155-160,166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "9ec11f336d77e6e3558ea4d70b3f3b6621d686cf",
+  "prompts": {},
+  "sessions": {
+    "s_7043cd469080d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45753d65-1e55-486e-b1e5-2a126038fd92",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
