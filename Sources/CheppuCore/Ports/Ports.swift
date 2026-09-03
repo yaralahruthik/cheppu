@@ -29,11 +29,23 @@ public protocol HotkeyPort: Sendable {
 
 /// The microphone.
 public protocol AudioCapturePort: Sendable {
-    /// Begins capturing. Called first of everything a Dictation does, so that no
-    /// speech is lost to the Cue that follows it.
-    func startCapturing() async throws
+    /// Begins capturing, reporting how loud it is hearing as it goes. Called
+    /// first of everything a Dictation does, so that no speech is lost to the
+    /// Cue that follows it.
+    ///
+    /// Throwing means the Dictation has no microphone — access refused, or a
+    /// device that would not open — and the core takes the Dictation down
+    /// rather than listening to nothing.
+    ///
+    /// The report may suspend, so that the levels reach the core in the order
+    /// they were heard. Whoever holds the microphone is responsible for the
+    /// hand-off never reaching the audio thread, which cannot afford to wait.
+    func startCapturing(reportingLevel: @escaping @Sendable (InputLevel) async -> Void) async throws
 
     /// Ends capturing and hands over what was captured.
+    ///
+    /// The audio belongs to the caller from here: whoever was holding it lets
+    /// go, so that nothing outlives the Dictation that produced it.
     func stopCapturing() async throws -> CapturedAudio
 }
 

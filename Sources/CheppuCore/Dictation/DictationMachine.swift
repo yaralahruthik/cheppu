@@ -25,6 +25,7 @@ public enum DictationEvent: Equatable, Sendable {
     case activationStarted
     case activationStopped
     case audioCaptured(CapturedAudio)
+    case inputLevelChanged(InputLevel)
     case rawTranscriptReceived(RawTranscript)
     case insertionSucceeded
 
@@ -75,7 +76,7 @@ public struct DictationMachine: Sendable {
             state = .listening
             // Capture opens before the Cue plays: the sound is feedback, but a
             // word spoken before the microphone is open is gone.
-            return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening)]
+            return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent))]
 
         case (.listening, .activationStopped):
             state = .transcribing
@@ -84,6 +85,13 @@ public struct DictationMachine: Sendable {
             // "transcribing" before the Engine is asked, so the pause that
             // follows is never mistaken for a hang.
             return [.stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing)]
+
+        case (.listening, .inputLevelChanged(let level)):
+            // Only while Listening. The last buffer the microphone heard can
+            // land after it was closed, and a Pill that flicked back to
+            // Listening over a Dictation already being transcribed would say
+            // the one thing the two states exist to tell apart.
+            return [.showPill(.listening(level))]
 
         case (.transcribing, .audioCaptured(let audio)):
             return [.transcribe(audio)]

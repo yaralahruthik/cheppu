@@ -46,7 +46,7 @@ struct DictationMachineTests {
             aWholeDictation(&machine) == [
                 .startCapturing,
                 .playCue(.dictationStarted),
-                .showPill(.listening),
+                .showPill(.listening(.silent)),
                 .stopCapturing,
                 .playCue(.dictationStopped),
                 .showPill(.transcribing),
@@ -125,7 +125,7 @@ struct DictationMachineTests {
         #expect(machine.receive(.activationStarted) == [
             .startCapturing,
             .playCue(.dictationStarted),
-            .showPill(.listening),
+            .showPill(.listening(.silent)),
         ])
     }
 
@@ -164,6 +164,36 @@ struct DictationMachineTests {
         var machine = DictationMachine()
 
         #expect(machine.receive(.insertionSucceeded).isEmpty)
+    }
+
+    @Test("The Pill opens at silence, so it never claims to hear something before it has")
+    func thePillOpensAtSilence() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.activationStarted).contains(.showPill(.listening(.silent))))
+    }
+
+    @Test("While Listening, what the microphone is hearing is what the Pill shows")
+    func whileListeningWhatTheMicrophoneIsHearingIsWhatThePillShows() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationStarted)
+
+        #expect(machine.receive(.inputLevelChanged(InputLevel(0.6))) == [.showPill(.listening(InputLevel(0.6)))])
+        #expect(machine.receive(.inputLevelChanged(InputLevel(0.1))) == [.showPill(.listening(InputLevel(0.1)))])
+    }
+
+    @Test("An input level arriving once the Dictation has stopped Listening changes nothing")
+    func anInputLevelArrivingOnceTheDictationHasStoppedListeningChangesNothing() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.inputLevelChanged(InputLevel(0.6))).isEmpty)
+
+        _ = machine.receive(.activationStarted)
+        _ = machine.receive(.activationStopped)
+        // The last buffer the microphone heard can land after it was closed. It
+        // must not put a Listening Pill back over a Dictation that is already
+        // transcribing.
+        #expect(machine.receive(.inputLevelChanged(InputLevel(0.6))).isEmpty)
     }
 
     @Test("A second Toggle Activation runs the same course as the first")
