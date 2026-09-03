@@ -1,0 +1,62 @@
+Sources/CheppuCore/Ports/Ports.swift
+  s_7043cd469080d3::t_068ebf5eecb0fd 32-43,46-48
+Tests/CheppuAudioTests/InputLevelMeterTests.swift
+  s_7043cd469080d3::t_0c1c3f64855a9c 1-126
+Sources/CheppuAudio/MicrophoneCapture.swift
+  s_7043cd469080d3::t_5da9e747860d1a 1-110,118-123
+  s_7043cd469080d3::t_fa6d2b94c01198 111-117
+App/Info.plist
+  s_7043cd469080d3::t_5724e0095441bd 26-29
+Tests/CheppuAudioTests/Fakes/FakeMicrophone.swift
+  s_7043cd469080d3::t_6aec0cce6cb245 1-95
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_7043cd469080d3::t_b832989c0b771f 43,53,89,168-184
+  s_7043cd469080d3::t_f65a02e773da12 185-186
+.github/workflows/ci.yml
+  s_7043cd469080d3::t_5724e0095441bd 30-34,43-47
+Sources/CheppuAudio/InputLevelMeter.swift
+  s_7043cd469080d3::t_10f7e3ce45cc5d 1-70
+Sources/CheppuAudio/Microphone.swift
+  s_7043cd469080d3::t_afd71773564135 1-126
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_7043cd469080d3::t_c662c23f1c0790 16-24,26-28
+Package.swift
+  s_7043cd469080d3::t_876b9f1d60542c 29-38,42,54-58
+Scripts/check-no-audio-reaches-the-disk.sh
+  s_7043cd469080d3::t_6ba5a393d6d254 1-36
+Sources/CheppuCore/Dictation/Dictation.swift
+  s_7043cd469080d3::t_068ebf5eecb0fd 77-97,102-106,108
+Tests/CheppuAudioTests/MicrophoneCaptureTests.swift
+  s_7043cd469080d3::t_11ae3172d0291f 147-153
+  s_7043cd469080d3::t_b54db7fcc07554 1-139,157-252
+  s_7043cd469080d3::t_fa6d2b94c01198 140-146,154-156
+README.md
+  s_7043cd469080d3::t_f66af8089096e7 68,71,76,79
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_7043cd469080d3::t_068ebf5eecb0fd 28,79,89-94
+  s_7043cd469080d3::t_11c04adf09b6b7 95
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_7043cd469080d3::t_579e46940a576f 49,128,169-197
+  s_7043cd469080d3::t_4b0fd59ca22105 198
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_7043cd469080d3::t_13ab049858408c 93-97,111
+  s_7043cd469080d3::t_068ebf5eecb0fd 91-92,98-99,105-110,112
+CONTEXT.md
+  s_7043cd469080d3::t_f66af8089096e7 83-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "6e2e2a7df3700b12064857852bbdf81677de5aac",
+  "prompts": {},
+  "sessions": {
+    "s_7043cd469080d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45753d65-1e55-486e-b1e5-2a126038fd92",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
