@@ -24,6 +24,11 @@ jobs:
       - name: Core is headless
         run: ./Scripts/check-core-is-headless.sh
 
+      - name: The Engine Download is the only network path
+        run: ./Scripts/check-the-download-is-the-only-network-path.sh
+
+      # No Engine downloaded and no model on this runner: the suite has to be
+      # green all the same, which is the whole point of the ports.
       - name: Core suite
         run: swift test
 

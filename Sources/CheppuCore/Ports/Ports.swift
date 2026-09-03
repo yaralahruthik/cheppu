@@ -46,6 +46,35 @@ public protocol EnginePort: Sendable {
     func transcribe(_ audio: CapturedAudio) async throws -> RawTranscript
 }
 
+/// Putting the Engine on the machine.
+///
+/// Separate from `EnginePort` because the two are asked for at different moments
+/// by different callers: Onboarding downloads once, a Dictation transcribes many
+/// times. One object in the app target satisfies both, which is where the
+/// ordering between them — nothing transcribes before the download has finished
+/// — actually lives.
+public protocol EngineDownloadPort: Sendable {
+    /// Whether every file the Engine needs is already on the machine.
+    ///
+    /// Answered from disk, without the network, so that the ordinary launch —
+    /// the Engine is already here — costs nothing.
+    func isEngineDownloaded() async -> Bool
+
+    /// Fetches whatever the Engine is missing, reporting progress as it arrives.
+    ///
+    /// Called again after an interrupted attempt, it carries on from where the
+    /// last one stopped rather than starting the 600 MB over. Returning normally
+    /// means the Engine is ready; throwing leaves what did arrive in place for
+    /// the next attempt to build on.
+    ///
+    /// The report is a notification and not a request: nothing waits on it, so
+    /// it is handed over synchronously rather than made something the download
+    /// has to await before fetching the next chunk.
+    func downloadEngine(
+        reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
+    ) async throws
+}
+
 /// Placing Final Text at the text cursor of the Target App.
 public protocol InsertionPort: Sendable {
     /// Inserts the Final Text as if it had been typed. Throwing means it did not

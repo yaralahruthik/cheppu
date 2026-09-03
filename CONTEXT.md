@@ -30,6 +30,10 @@ _Avoid_: shortcut, keybinding
 The on-device speech-to-text model that turns audio into a Raw Transcript. The MVP ships exactly one.
 _Avoid_: model, backend, provider, recognizer
 
+**Engine Download**:
+The one-time download that puts the Engine's files on the machine under Application Support. Resumable, and the only network access Cheppu ever makes.
+_Avoid_: model download, install, setup
+
 **Raw Transcript**:
 The text exactly as the Engine produced it, before Cleanup.
 _Avoid_: transcription, output
