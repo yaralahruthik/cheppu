@@ -2,10 +2,35 @@ import Foundation
 
 @testable import CheppuCore
 
-/// The Hotkey the tests press. Nothing is wired to it yet: the core is driven
-/// through its own door until the real `CGEvent` tap arrives.
-struct FakeHotkey: HotkeyPort {
-    func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async {}
+/// The Hotkey the tests press.
+///
+/// A real one watches the whole keyboard for one key; this one is tapped when
+/// the test says so, which is the same thing to the core. It can also be a
+/// keyboard Cheppu is not allowed to watch, which is what a machine without
+/// Accessibility granted looks like from here.
+actor FakeHotkey: HotkeyPort {
+    private let isAccessibilityGranted: Bool
+    private var reportTo: (@Sendable (HotkeyEvent) async -> Void)?
+
+    init(isAccessibilityGranted: Bool = true) {
+        self.isAccessibilityGranted = isAccessibilityGranted
+    }
+
+    func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async throws {
+        guard isAccessibilityGranted else { throw HotkeyFailure.accessibilityDenied }
+        reportTo = handler
+    }
+
+    /// The user taps the Hotkey.
+    ///
+    /// Waits for everything the tap set in motion, so a test can tap twice and
+    /// then read back a whole Dictation.
+    func tap() async {
+        await reportTo?(.tapped)
+    }
+
+    /// Whether anything is listening for a tap.
+    var isBeingWatched: Bool { reportTo != nil }
 }
 
 /// Audio capture that hands back canned audio without a microphone.

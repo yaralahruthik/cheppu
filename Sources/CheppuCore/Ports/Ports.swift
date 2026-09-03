@@ -14,18 +14,25 @@ import Foundation
 /// a bare modifier, a chord, or a test. Hold and Escape join it with their own
 /// tickets.
 public enum HotkeyEvent: Equatable, Sendable {
-    case activationStarted
-    case activationStopped
+    /// The Hotkey was tapped on its own: pressed and released with no other key
+    /// held and nothing typed in between.
+    ///
+    /// What a tap means depends on whether a Dictation is running, and the
+    /// keyboard is the one place that cannot know. So the port reports the tap
+    /// and the machine decides, which is what keeps a tap after the Cap has
+    /// ended a Dictation a start rather than a stop nobody is waiting for.
+    case tapped
 }
 
 /// Where Activation gestures come from.
-///
-/// Nothing observes this yet: until the real `CGEvent` tap lands, a Dictation is
-/// driven through `DictationCore.receive(_:)` directly.
 public protocol HotkeyPort: Sendable {
     /// Starts reporting Activation gestures, replacing any handler already
     /// installed.
-    func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async
+    ///
+    /// Throwing means Cheppu may not watch the keyboard —
+    /// `HotkeyFailure.accessibilityDenied` — so that a Hotkey which cannot work
+    /// is something the app says out loud rather than a key that does nothing.
+    func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async throws
 }
 
 /// The microphone.

@@ -31,8 +31,8 @@ struct DictationMachineTests {
     /// Everything a Toggle Activation decides, from the first tap to the words
     /// landing.
     private func aWholeDictation(_ machine: inout DictationMachine) -> [DictationEffect] {
-        machine.receive(.activationStarted)
-            + machine.receive(.activationStopped)
+        machine.receive(.activationToggled)
+            + machine.receive(.activationToggled)
             + machine.receive(.audioCaptured(spokenAudio))
             + machine.receive(.rawTranscriptReceived(heardWords))
             + machine.receive(.insertionSucceeded)
@@ -123,6 +123,54 @@ struct DictationMachineTests {
 
         #expect(machine.receive(.dictationFailed) == [.hidePill])
         #expect(machine.receive(.activationStarted) == [
+            .startCapturing,
+            .playCue(.dictationStarted),
+            .showPill(.listening(.silent)),
+        ])
+    }
+
+    @Test("A tap of the Hotkey starts a Dictation, and the next tap stops it")
+    func aTapStartsADictationAndTheNextTapStopsIt() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.activationToggled) == [
+            .startCapturing,
+            .playCue(.dictationStarted),
+            .showPill(.listening(.silent)),
+        ])
+        #expect(machine.receive(.activationToggled) == [
+            .stopCapturing,
+            .playCue(.dictationStopped),
+            .showPill(.transcribing),
+        ])
+    }
+
+    @Test("A tap while it is transcribing changes nothing")
+    func aTapWhileItIsTranscribingChangesNothing() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationToggled)
+        _ = machine.receive(.activationToggled)
+
+        // The Dictation is with the Engine. A tap here is an impatient user, not
+        // a third state, and starting a second Dictation over the top of one
+        // being transcribed would lose the first.
+        #expect(machine.receive(.activationToggled).isEmpty)
+    }
+
+    @Test("A tap after a Dictation ended without the Hotkey starts the next one")
+    func aTapAfterADictationEndedWithoutTheHotkeyStartsTheNextOne() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationToggled)
+
+        // Something other than the Hotkey ended that Dictation — here a
+        // failure, later the Cap or a Cancel. Whether the next tap starts or
+        // stops is the machine's to answer for exactly this reason: anything
+        // else keeping its own copy of "is a Dictation running" would now be
+        // wrong, and the user's next tap would do the opposite of what they
+        // meant.
+        _ = machine.receive(.dictationFailed)
+
+        #expect(machine.receive(.activationToggled) == [
             .startCapturing,
             .playCue(.dictationStarted),
             .showPill(.listening(.silent)),
