@@ -2,7 +2,8 @@ import Foundation
 
 // Cheppu's core decides; the ports do. Each one is the narrowest description of
 // a thing the core needs done that it cannot do itself, and each has exactly two
-// implementations: the real one in the app target, and a fake in the core suite.
+// implementations: the real one in whichever target owns that piece of the OS —
+// the app, the Engine, the microphone — and a fake in the core suite.
 //
 // This is what lets the whole of Cheppu's behaviour be tested with no
 // permissions granted, no Engine downloaded, no network, and no audio hardware.
@@ -37,10 +38,14 @@ public protocol AudioCapturePort: Sendable {
     /// device that would not open — and the core takes the Dictation down
     /// rather than listening to nothing.
     ///
+    /// A refusal throws `AudioCaptureFailure.accessDenied`, which is the core's
+    /// own vocabulary rather than the microphone's, so that the core can tell a
+    /// refusal from a device that would not open.
+    ///
     /// The report may suspend, so that the levels reach the core in the order
     /// they were heard. Whoever holds the microphone is responsible for the
     /// hand-off never reaching the audio thread, which cannot afford to wait.
-    func startCapturing(reportingLevel: @escaping @Sendable (InputLevel) async -> Void) async throws
+    func startCapturing(reporting: @escaping @Sendable (InputLevel) async -> Void) async throws
 
     /// Ends capturing and hands over what was captured.
     ///

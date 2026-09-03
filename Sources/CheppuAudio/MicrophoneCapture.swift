@@ -14,7 +14,7 @@ public actor MicrophoneCapture: AudioCapturePort {
 
     /// One Dictation's audio, and nothing before or after it.
     private var heard: [Float] = []
-    private var openedAt: Double = 0
+    private var sampleRate: Double = 0
     private var meter = InputLevelMeter()
 
     /// What is carrying buffers from the device into this actor, while there is
@@ -34,14 +34,14 @@ public actor MicrophoneCapture: AudioCapturePort {
     }
 
     public func startCapturing(
-        reportingLevel report: @escaping @Sendable (InputLevel) async -> Void
+        reporting report: @escaping @Sendable (InputLevel) async -> Void
     ) async throws {
         // Asked for here, at the moment a Dictation needs it, rather than at
         // launch — and asked again every Dictation rather than remembered, so
         // that a grant taken away in System Settings is refused at the next
         // attempt instead of failing somewhere further in
         // (`docs/product-experience.md` §9).
-        guard await access.request() else { throw MicrophoneFailure.accessDenied }
+        guard await access.request() else { throw AudioCaptureFailure.accessDenied }
 
         // Nothing the machine does asks for this, but a device left open with no
         // Dictation behind it would be a microphone running unannounced.
@@ -62,7 +62,7 @@ public actor MicrophoneCapture: AudioCapturePort {
             bufferingPolicy: .unbounded)
 
         do {
-            openedAt = try microphone.open { arriving.yield($0) }
+            sampleRate = try microphone.open { arriving.yield($0) }
         } catch {
             arriving.finish()
             throw error
@@ -78,10 +78,10 @@ public actor MicrophoneCapture: AudioCapturePort {
     }
 
     public func stopCapturing() async throws -> CapturedAudio {
-        guard listening != nil else { throw MicrophoneFailure.notCapturing }
+        guard listening != nil else { throw AudioCaptureFailure.notCapturing }
         await stopListening()
 
-        let spoken = CapturedAudio(samples: heard, sampleRate: openedAt)
+        let spoken = CapturedAudio(samples: heard, sampleRate: sampleRate)
         // Let go of it as it is handed on. From here the audio exists in one
         // place, on its way to the Engine, and stops existing when that is done.
         heard = []
@@ -105,7 +105,7 @@ public actor MicrophoneCapture: AudioCapturePort {
     /// Takes one buffer: keeps it, and reads how loud it was.
     private func take(_ buffer: [Float]) -> InputLevel {
         heard.append(contentsOf: buffer)
-        return meter.hearing(buffer, at: openedAt)
+        return meter.hearing(buffer, at: sampleRate)
     }
 
     /// Whether a Dictation's audio is still being held here.

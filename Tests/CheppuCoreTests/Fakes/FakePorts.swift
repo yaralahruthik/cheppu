@@ -19,7 +19,7 @@ struct FakeAudioCapture: AudioCapturePort {
     /// scheduler gets round to it.
     var hearsLevels: [InputLevel] = []
 
-    func startCapturing(reportingLevel report: @escaping @Sendable (InputLevel) async -> Void)
+    func startCapturing(reporting report: @escaping @Sendable (InputLevel) async -> Void)
         async throws
     {
         await journal.record(.capturingStarted)

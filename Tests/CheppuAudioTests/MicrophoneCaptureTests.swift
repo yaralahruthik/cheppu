@@ -12,21 +12,16 @@ import Testing
 struct MicrophoneCaptureTests {
     private static func capture(
         _ microphone: FakeMicrophone,
-        access: FakeMicrophoneAccess = FakeMicrophoneAccess(grants: true)
+        access: FakeMicrophoneAccess = FakeMicrophoneAccess(answering: [true])
     ) -> MicrophoneCapture {
         MicrophoneCapture(access: access, microphone: microphone)
-    }
-
-    /// A buffer of a constant amplitude, long enough to read as itself.
-    private static func buffer(at amplitude: Float, frames: Int = 4_096) -> [Float] {
-        (0..<frames).map { $0.isMultiple(of: 2) ? amplitude : -amplitude }
     }
 
     // MARK: - Asking to listen
 
     @Test("Microphone access is asked for when capture is first needed, and not before")
     func microphoneAccessIsAskedForWhenCaptureIsFirstNeededAndNotBefore() async throws {
-        let access = FakeMicrophoneAccess(grants: true)
+        let access = FakeMicrophoneAccess(answering: [true])
         let capture = Self.capture(FakeMicrophone(), access: access)
 
         // Nothing has been asked for by building the thing that will ask. The
@@ -41,9 +36,9 @@ struct MicrophoneCaptureTests {
     @Test("A refused Microphone is a failure the core can act on, not a silent nothing")
     func aRefusedMicrophoneIsAFailureTheCoreCanActOn() async throws {
         let microphone = FakeMicrophone()
-        let capture = Self.capture(microphone, access: FakeMicrophoneAccess(grants: false))
+        let capture = Self.capture(microphone, access: FakeMicrophoneAccess(answering: [false]))
 
-        await #expect(throws: MicrophoneFailure.accessDenied) {
+        await #expect(throws: AudioCaptureFailure.accessDenied) {
             try await capture.startCapturing { _ in }
         }
 
@@ -61,7 +56,7 @@ struct MicrophoneCaptureTests {
 
         // Access is asked for again every Dictation rather than remembered, so
         // a grant taken away in System Settings is noticed at the next attempt.
-        await #expect(throws: MicrophoneFailure.accessDenied) {
+        await #expect(throws: AudioCaptureFailure.accessDenied) {
             try await capture.startCapturing { _ in }
         }
         #expect(microphone.timesOpened == 1)
@@ -76,7 +71,7 @@ struct MicrophoneCaptureTests {
         }
 
         // And nothing is left half-open behind it.
-        await #expect(throws: MicrophoneFailure.notCapturing) {
+        await #expect(throws: AudioCaptureFailure.notCapturing) {
             _ = try await capture.stopCapturing()
         }
     }
@@ -158,7 +153,7 @@ struct MicrophoneCaptureTests {
     func stoppingWhenNothingIsCapturingSaysSo() async throws {
         let capture = Self.capture(FakeMicrophone())
 
-        await #expect(throws: MicrophoneFailure.notCapturing) {
+        await #expect(throws: AudioCaptureFailure.notCapturing) {
             _ = try await capture.stopCapturing()
         }
     }
@@ -188,9 +183,9 @@ struct MicrophoneCaptureTests {
         let capture = Self.capture(microphone)
         let reported = ReportedLevels()
 
-        try await capture.startCapturing(reportingLevel: reported.report)
+        try await capture.startCapturing(reporting: reported.report)
         for _ in 0..<5 {
-            microphone.hears(Self.buffer(at: 0.2))
+            microphone.hears(buffer(at: 0.2))
         }
         _ = try await capture.stopCapturing()
 
@@ -205,9 +200,9 @@ struct MicrophoneCaptureTests {
         let capture = Self.capture(microphone)
         let reported = ReportedLevels()
 
-        try await capture.startCapturing(reportingLevel: reported.report)
-        microphone.hears(Self.buffer(at: 0.0001))
-        microphone.hears(Self.buffer(at: 0.4))
+        try await capture.startCapturing(reporting: reported.report)
+        microphone.hears(buffer(at: 0.0001))
+        microphone.hears(buffer(at: 0.4))
         _ = try await capture.stopCapturing()
 
         let levels = await reported.levels
@@ -215,22 +210,40 @@ struct MicrophoneCaptureTests {
         #expect(try #require(levels.last).value > 0.5)
     }
 
-    @Test("Every buffer heard before the Dictation stopped is counted, however late it arrived")
-    func everyBufferHeardBeforeTheDictationStoppedIsCounted() async throws {
+    @Test("Every buffer the microphone handed over before it closed is counted")
+    func everyBufferTheMicrophoneHandedOverBeforeItClosedIsCounted() async throws {
         let microphone = FakeMicrophone()
         let capture = Self.capture(microphone)
         let reported = ReportedLevels()
 
-        try await capture.startCapturing(reportingLevel: reported.report)
+        try await capture.startCapturing(reporting: reported.report)
         for _ in 0..<200 {
-            microphone.hears(Self.buffer(at: 0.2, frames: 512))
+            microphone.hears(buffer(at: 0.2, frames: 512))
         }
         let spoken = try await capture.stopCapturing()
 
-        // Stopping waits for what the device already handed over rather than
-        // dropping the tail of the Dictation on the floor.
+        // Buffers cross into the actor one at a time and a Dictation can stop
+        // with a queue of them still crossing. Stopping waits for that queue
+        // rather than dropping the tail of the Dictation on the floor.
         #expect(spoken.samples.count == 200 * 512)
         #expect(await reported.levels.count == 200)
+    }
+
+    @Test("The level reaches the Pill while the Dictation is still listening, not at the end of it")
+    func theLevelReachesThePillWhileTheDictationIsStillListening() async throws {
+        let microphone = FakeMicrophone()
+        let capture = Self.capture(microphone)
+        let reported = ReportedLevels()
+
+        try await capture.startCapturing(reporting: reported.report)
+        microphone.hears(buffer(at: 0.4))
+
+        // Awaited before the Dictation is stopped. "Continuously while
+        // capturing" means the Pill can be redrawn during the Dictation, not
+        // that every level turns up once it is over.
+        #expect(await reported.nextLevel().value > 0.5)
+
+        _ = try await capture.stopCapturing()
     }
 
     @Test("A Dictation that starts loud does not open on the level of the one before it")
@@ -239,12 +252,12 @@ struct MicrophoneCaptureTests {
         let capture = Self.capture(microphone)
 
         try await capture.startCapturing { _ in }
-        microphone.hears(Self.buffer(at: 1))
+        microphone.hears(buffer(at: 1))
         _ = try await capture.stopCapturing()
 
         let reported = ReportedLevels()
-        try await capture.startCapturing(reportingLevel: reported.report)
-        microphone.hears(Self.buffer(at: 0))
+        try await capture.startCapturing(reporting: reported.report)
+        microphone.hears(buffer(at: 0))
         _ = try await capture.stopCapturing()
 
         #expect(await reported.levels == [.silent])

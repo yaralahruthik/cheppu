@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 
 AUDIO_FILES='AVAudioFile|AVAudioRecorder|AVAssetWriter|AVAssetExportSession|ExtAudioFile|AudioFileCreate|AudioFileOpen|AudioFileWrite|AudioFileInit'
 
-FILESYSTEM='FileManager|FileHandle|OutputStream|FilePath|fopen|fwrite|Data\(contentsOf:|\.write\(to:|URL\(fileURLWithPath:|appendingPathComponent|\.appending\(path:'
+FILESYSTEM='FileManager|FileHandle|OutputStream|FilePath|fopen|fwrite|Data\(contentsOf:|\.write\(to:|\.write\(toFile:|URL\(fileURLWithPath:|URL\(filePath:|appendingPathComponent|\.appending\(path:'
 
 FOUND=$(grep -rnE --include='*.swift' "$AUDIO_FILES" Sources || true)
 if [ -n "$FOUND" ]; then

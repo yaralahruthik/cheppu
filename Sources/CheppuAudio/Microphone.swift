@@ -1,23 +1,6 @@
 import AVFoundation
+import CheppuCore
 import Foundation
-
-/// Something has gone wrong with the microphone.
-///
-/// Three ways, and the user can tell them apart: they said no, there is nothing
-/// to listen with, and Cheppu asked in the wrong order.
-public enum MicrophoneFailure: Error, Equatable {
-    /// Microphone access was refused, or granted once and taken away since.
-    case accessDenied
-
-    /// There is no input device to open — none attached, or the one that was
-    /// there has gone.
-    case noMicrophone
-
-    /// Capture was stopped without having been started. Cheppu's own mistake
-    /// rather than the user's, and said out loud rather than answered with an
-    /// empty Dictation, which would look like a Dictation that heard nothing.
-    case notCapturing
-}
 
 /// Whether Cheppu may listen.
 ///
@@ -51,7 +34,13 @@ protocol Microphone: Sendable {
 /// actor, which is what serializes them; the tap block that runs on the audio
 /// thread touches nothing this class owns.
 final class SystemMicrophone: Microphone, @unchecked Sendable {
-    private let engine = AVAudioEngine()
+    /// A new engine per Dictation rather than one kept for the life of the app.
+    ///
+    /// An engine holds the configuration it was built against, and the default
+    /// input can change between two Dictations — headphones plugged in, an
+    /// interface woken up. Building it here is how the second Dictation opens
+    /// the device the user is actually speaking into.
+    private var engine: AVAudioEngine?
 
     /// Frames per buffer. At the 48 kHz a Mac's microphone usually opens at
     /// this is 85 ms, which is about as often as a level is worth redrawing and
@@ -59,14 +48,21 @@ final class SystemMicrophone: Microphone, @unchecked Sendable {
     private static let bufferSize: AVAudioFrameCount = 4_096
 
     func open(_ heard: @escaping @Sendable ([Float]) -> Void) throws -> Double {
+        let engine = AVAudioEngine()
         let input = engine.inputNode
-        let format = input.inputFormat(forBus: 0)
+
+        // The node's output format, not its input format. They are usually the
+        // same on a Mac, and when they are not, `installTap` raises an
+        // Objective-C exception rather than throwing — which no `catch` here
+        // could turn into a failure the core can act on. This is the format the
+        // tap is defined against.
+        let format = input.outputFormat(forBus: 0)
 
         // A Mac with no input device answers with a format of no channels at no
         // rate rather than by failing, and starting the engine on that would be
         // a Dictation that listened to nothing and said nothing about it.
         guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw MicrophoneFailure.noMicrophone
+            throw AudioCaptureFailure.noMicrophone
         }
 
         input.installTap(onBus: 0, bufferSize: Self.bufferSize, format: format) { buffer, _ in
@@ -78,15 +74,24 @@ final class SystemMicrophone: Microphone, @unchecked Sendable {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
-            throw error
+            // What AVFoundation says here is about a device that would not
+            // open, and it says it in words no user could act on. The core is
+            // told the one thing it can act on instead.
+            throw AudioCaptureFailure.noMicrophone
         }
 
+        self.engine = engine
         return format.sampleRate
     }
 
     func close() {
-        engine.stop()
+        guard let engine else { return }
+        self.engine = nil
+
+        // The tap comes off before the engine stops, so nothing is left
+        // half-attached to an engine on its way down.
         engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
     }
 
     /// The buffer as the one channel a Dictation is made of.

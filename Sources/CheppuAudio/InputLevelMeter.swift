@@ -19,17 +19,18 @@ import Foundation
 /// as fast as `halfLife`, which is long enough to bridge a syllable and short
 /// enough that stopping mid-sentence is visible.
 struct InputLevelMeter {
-    /// The quietest sound the Pill shows anything for. Below this is room tone,
-    /// fan noise and the microphone's own floor — nothing the user said, and
-    /// nothing they could act on.
-    static let floor: Double = -60
+    /// The quietest sound the Pill shows anything for, in dBFS. Below this is
+    /// room tone, fan noise and the microphone's own floor — nothing the user
+    /// said, and nothing they could act on.
+    static let quietestWorthHearing: Double = -60
 
-    /// How long the reading takes to fall by half once the sound stops.
+    /// How long the reading takes to fall by half once the sound stops, in
+    /// seconds.
     ///
-    /// Measured in time rather than in buffers, because the buffer size belongs
-    /// to the device: the same voice must not decay differently on different
-    /// hardware.
-    static let halfLife = Duration.milliseconds(150)
+    /// A span of time rather than a number of buffers, because the buffer size
+    /// belongs to the device: the same voice must not decay differently on
+    /// different hardware.
+    static let halfLife: Double = 0.15
 
     private var reading: Double = 0
 
@@ -41,9 +42,13 @@ struct InputLevelMeter {
         guard !samples.isEmpty, sampleRate > 0 else { return InputLevel(reading) }
 
         let elapsed = Double(samples.count) / sampleRate
-        let decayed = reading * pow(0.5, elapsed / Self.halfLife.asSeconds)
+        let decayed = reading * pow(0.5, elapsed / Self.halfLife)
 
-        reading = max(Self.loudness(of: samples), decayed)
+        // Held inside the range the Pill draws rather than only clamped on the
+        // way out. A device that hands over samples past full scale would
+        // otherwise leave the reading decaying from somewhere above 1, and the
+        // Pill pinned full for a moment after the sound had gone.
+        reading = min(max(Self.loudness(of: samples), decayed), 1)
         return InputLevel(reading)
     }
 
@@ -57,14 +62,9 @@ struct InputLevelMeter {
         let rootMeanSquare = (sumOfSquares / Double(samples.count)).squareRoot()
         guard rootMeanSquare > 0 else { return 0 }
 
+        // Full scale is 0 dBFS and the floor is negative, so this is 1 at the
+        // loudest the microphone can hear and 0 at the quietest worth showing.
         let decibels = 20 * log10(rootMeanSquare)
-        return (decibels - floor) / -floor
-    }
-}
-
-extension Duration {
-    /// This Duration in seconds.
-    var asSeconds: Double {
-        Double(components.seconds) + Double(components.attoseconds) * 1e-18
+        return 1 - decibels / quietestWorthHearing
     }
 }

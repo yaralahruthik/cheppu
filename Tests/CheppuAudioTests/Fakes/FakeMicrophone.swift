@@ -66,10 +66,6 @@ actor FakeMicrophoneAccess: MicrophoneAccess {
     private var answers: [Bool]
     private(set) var timesAsked = 0
 
-    init(grants: Bool) {
-        self.answers = [grants]
-    }
-
     init(answering answers: [Bool]) {
         self.answers = answers
     }
@@ -84,8 +80,33 @@ actor FakeMicrophoneAccess: MicrophoneAccess {
 actor ReportedLevels {
     private(set) var levels: [InputLevel] = []
 
+    /// How many of them `nextLevel()` has handed back, and whoever is waiting
+    /// for one that has not arrived yet.
+    private var delivered = 0
+    private var waiting: CheckedContinuation<InputLevel, Never>?
+
     func record(_ level: InputLevel) {
         levels.append(level)
+        if let waiting {
+            self.waiting = nil
+            delivered += 1
+            waiting.resume(returning: level)
+        }
+    }
+
+    /// The next level reported, waiting for it if it has not arrived.
+    ///
+    /// What lets a test assert on a level *while* the Dictation is still
+    /// listening rather than reading them all back once it has stopped, which
+    /// would prove they arrived but not that they arrived in time to be shown.
+    func nextLevel() async -> InputLevel {
+        if delivered < levels.count {
+            defer { delivered += 1 }
+            return levels[delivered]
+        }
+        return await withCheckedContinuation { continuation in
+            waiting = continuation
+        }
     }
 
     /// The report as `MicrophoneCapture` wants it.
