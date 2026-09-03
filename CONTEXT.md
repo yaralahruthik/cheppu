@@ -80,6 +80,10 @@ _Avoid_: destination, frontmost app, active window
 The small floating overlay that appears during a Dictation and shows its state and the live input level.
 _Avoid_: HUD, overlay, indicator, widget
 
+**Input Level**:
+How loud the microphone is hearing, from silence to the loudest it can hear, reported continuously while a Dictation is listening and drawn by the Pill.
+_Avoid_: volume, amplitude, meter, VU
+
 **Cue**:
 A short sound played when a Dictation starts and when it stops.
 _Avoid_: beep, chime, sound effect

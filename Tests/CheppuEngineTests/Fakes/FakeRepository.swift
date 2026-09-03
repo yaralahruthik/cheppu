@@ -39,6 +39,18 @@ final class FakeRepository: @unchecked Sendable {
     /// answering. Only a cancellation ends a transfer against this.
     var stallsAfter: Int?
 
+    /// Ends every body after this many bytes and finishes normally, standing in
+    /// for a download interrupted partway once the dust has settled.
+    ///
+    /// Separate from `dropsAfter` because a failing task and the bytes it had
+    /// already handed over race each other: URLSession is entitled to throw away
+    /// what it was holding when a connection failed, and under load it does — so
+    /// a drop leaves *some* prefix on disk and not a knowable one. A body that
+    /// simply ends leaves exactly this many bytes every time, which is what lets
+    /// a test name the byte a resume has to ask from. What reaches the disk is
+    /// the same either way; only whether the test can predict it differs.
+    var truncatesAfter: Int?
+
     /// Answers with the right number of bytes and the wrong ones, standing in
     /// for a mirror or a proxy serving something that is not what the
     /// repository published.
@@ -177,7 +189,8 @@ final class FakeRepositoryProtocol: URLProtocol, @unchecked Sendable {
         }
         finish(
             status: answer.status, body: answer.body, for: url,
-            droppingAfter: repository.dropsAfter, stallingAfter: repository.stallsAfter)
+            droppingAfter: repository.dropsAfter, stallingAfter: repository.stallsAfter,
+            truncatingAfter: repository.truncatesAfter)
     }
 
     override func stopLoading() {}
@@ -191,11 +204,12 @@ final class FakeRepositoryProtocol: URLProtocol, @unchecked Sendable {
     private static let wire = DispatchQueue(label: "cheppu.fake-repository")
 
     private func finish(
-        status: Int, body: Data, for url: URL, droppingAfter: Int? = nil, stallingAfter: Int? = nil
+        status: Int, body: Data, for url: URL, droppingAfter: Int? = nil, stallingAfter: Int? = nil,
+        truncatingAfter: Int? = nil
     ) {
         let response = HTTPURLResponse(
             url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
-        let cutoff = droppingAfter ?? stallingAfter
+        let cutoff = droppingAfter ?? stallingAfter ?? truncatingAfter
         let sending = cutoff.map { body.prefix($0) } ?? body[...]
         let cut = sending.count < body.count
         let dropped = droppingAfter != nil && cut

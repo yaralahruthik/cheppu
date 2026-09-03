@@ -65,17 +65,18 @@ Choosing the Fn/Globe key as your hotkey adds one more, Input Monitoring, and ne
 
 ## Building
 
-Cheppu is a Swift package of three targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `Cheppu` is the menu bar app that performs what the core decides.
+Cheppu is a Swift package of four targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `Cheppu` is the menu bar app that performs what the core decides.
 
 ```sh
-swift build                     # build the core, the Engine and the app
+swift build                     # build the core, the Engine, the microphone and the app
 swift test                      # run the suite
 ./Scripts/make-app.sh           # assemble dist/Cheppu.app
 ./Scripts/check-core-is-headless.sh
 ./Scripts/check-the-download-is-the-only-network-path.sh
+./Scripts/check-no-audio-reaches-the-disk.sh
 ```
 
-The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
+The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, so running it never asks your terminal for Microphone access. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
 
 Transcribing for real needs the 480 MB Engine, so those tests are off by default and off in CI:
 

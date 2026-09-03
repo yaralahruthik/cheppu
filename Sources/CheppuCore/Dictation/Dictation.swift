@@ -74,12 +74,38 @@ public struct HistoryEntry: Equatable, Sendable {
     }
 }
 
+/// How loud the microphone is hearing, from silence to the loudest it can hear.
+///
+/// A number the Pill can draw directly rather than decibels it would have to
+/// interpret: the question the user is asking is "can it hear me right now?",
+/// and the answer to that is a height, not a measurement. What that number is
+/// made of — the loudness of a buffer, and how fast the reading is allowed to
+/// fall — belongs to whoever is holding the microphone.
+public struct InputLevel: Equatable, Sendable {
+    /// Silence, and where the Pill opens: a Dictation must never look like it
+    /// is hearing something before it has heard anything.
+    public static let silent = InputLevel(0)
+
+    public let value: Double
+
+    /// Clamped, because a level outside 0...1 is not something the Pill could
+    /// draw and not something the user could read.
+    public init(_ value: Double) {
+        self.value = min(max(value, 0), 1)
+    }
+}
+
 /// What the Pill is showing.
 ///
 /// The two states the user has to be able to tell apart without looking
 /// carefully: it is hearing me, and it is working on what it heard.
+///
+/// Listening carries the level rather than sitting next to it. A Pill that says
+/// "listening" and nothing else answers the wrong question — the user wants to
+/// know it is hearing *them*, not that it is switched on (see
+/// `docs/product-experience.md` §3) — so the two are never separable states.
 public enum PillState: Equatable, Sendable {
-    case listening
+    case listening(InputLevel)
     case transcribing
 }
 

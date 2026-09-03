@@ -152,15 +152,18 @@ struct EngineDownloadTests {
         let scenario = Scenario()
         defer { scenario.cleanUp() }
 
-        // The connection drops after 1 kB of every file, which the largest of
-        // them is four times over.
-        scenario.repository.dropsAfter = 1_000
+        // Every body ends after 1 kB, which the largest of these files is four
+        // times over. A body that ends rather than a connection that fails, so
+        // that what is left to resume from is exactly what was sent and the
+        // test can name the byte the next attempt has to ask from — see
+        // `FakeRepository.truncatesAfter`.
+        scenario.repository.truncatesAfter = 1_000
         await #expect(throws: (any Error).self) {
             try await scenario.run(scenario.download())
         }
 
         let interrupted = scenario.repository.everythingAsked
-        scenario.repository.dropsAfter = nil
+        scenario.repository.truncatesAfter = nil
         try await scenario.run(scenario.download())
 
         // Whatever the first attempt was in the middle of is asked for again

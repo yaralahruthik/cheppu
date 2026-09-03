@@ -23,6 +23,10 @@
 	<!-- Cheppu is a menu bar app: no Dock icon, no main window. -->
 	<key>LSUIElement</key>
 	<true/>
+	<!-- The one sentence macOS shows in the Microphone prompt, at the moment
+	     the first Dictation needs it. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cheppu listens through your microphone only while you are dictating, and the audio never leaves your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT licensed.</string>
 </dict>

@@ -88,12 +88,28 @@ public actor DictationCore {
         }
     }
 
+    /// Takes a level from whoever is holding the microphone.
+    ///
+    /// It does not throw where `receive(_:)` does, because the microphone has
+    /// nowhere to put an error it was handed back mid-Dictation, and because
+    /// nothing a level sets in motion can fail: the Pill is the whole of it.
+    private func hear(_ level: InputLevel) async {
+        try? await receive(.inputLevelChanged(level))
+    }
+
     /// Carries out one effect, and answers with what the port reported, if it
     /// reported anything the machine needs to hear about.
     private func perform(_ effect: DictationEffect) async throws -> DictationEvent? {
         switch effect {
         case .startCapturing:
-            try await audio.startCapturing()
+            // The level arrives many times over one Dictation, so it comes back
+            // through the same door every other event does rather than being
+            // handed to the Pill behind the machine's back. That is what makes
+            // a level heard after the microphone closed a decision the machine
+            // gets to ignore.
+            try await audio.startCapturing { [weak self] level in
+                await self?.hear(level)
+            }
             return nil
 
         case .stopCapturing:

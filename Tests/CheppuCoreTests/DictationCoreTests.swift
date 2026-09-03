@@ -40,6 +40,7 @@ struct DictationCoreTests {
         init(
             hears: RawTranscript = DictationCoreTests.heardWords,
             captures: CapturedAudio = DictationCoreTests.spokenAudio,
+            hearsLevels: [InputLevel] = [],
             now: Date = DictationCoreTests.aTuesdayAfternoon,
             insertionRefuses: Bool = false
         ) {
@@ -49,7 +50,7 @@ struct DictationCoreTests {
             self.clock = clock
             self.core = DictationCore(
                 hotkey: FakeHotkey(),
-                audio: FakeAudioCapture(journal: journal, captured: captures),
+                audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
                 insertion: insertionRefuses ? RefusingInsertion() : FakeInsertion(journal: journal),
                 clipboard: FakeClipboard(),
@@ -85,7 +86,7 @@ struct DictationCoreTests {
             await scenario.journal.calls == [
                 .capturingStarted,
                 .cuePlayed(.dictationStarted),
-                .pillShown(.listening),
+                .pillShown(.listening(.silent)),
                 .capturingStopped,
                 .cuePlayed(.dictationStopped),
                 .pillShown(.transcribing),
@@ -162,6 +163,25 @@ struct DictationCoreTests {
         try await scenario.core.receive(.activationStarted)
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
+    }
+
+    @Test("What the microphone is hearing is what the Pill is told to show")
+    func whatTheMicrophoneIsHearingIsWhatThePillIsToldToShow() async throws {
+        let scenario = Scenario(hearsLevels: [InputLevel(0.2), InputLevel(0.7)])
+
+        try await scenario.toggleADictation()
+
+        #expect(
+            await Array(scenario.journal.calls.prefix(5)) == [
+                .capturingStarted,
+                .cuePlayed(.dictationStarted),
+                // The Pill opens at silence and then shows each level the
+                // microphone reported, in the order it was heard.
+                .pillShown(.listening(.silent)),
+                .pillShown(.listening(InputLevel(0.2))),
+                .pillShown(.listening(InputLevel(0.7))),
+            ]
+        )
     }
 
     @Test("Stopping a Dictation that was never started touches nothing")

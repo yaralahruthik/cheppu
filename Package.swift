@@ -26,10 +26,20 @@ let package = Package(
             ]
         ),
 
+        // The microphone: the one place Cheppu opens an audio device and asks
+        // for Microphone access. A target of its own rather than part of the
+        // app so that everything except the device itself — what is asked for
+        // and when, what is kept, what is let go of, and the level the Pill
+        // draws — is testable with nothing granted and nothing plugged in.
+        .target(
+            name: "CheppuAudio",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
-            dependencies: ["CheppuCore", "CheppuEngine"]
+            dependencies: ["CheppuCore", "CheppuEngine", "CheppuAudio"]
         ),
 
         .testTarget(
@@ -40,6 +50,11 @@ let package = Package(
         .testTarget(
             name: "CheppuEngineTests",
             dependencies: ["CheppuEngine"]
+        ),
+
+        .testTarget(
+            name: "CheppuAudioTests",
+            dependencies: ["CheppuAudio"]
         ),
     ],
     swiftLanguageModes: [.v6]

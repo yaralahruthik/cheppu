@@ -13,8 +13,19 @@ struct FakeAudioCapture: AudioCapturePort {
     let journal: PortJournal
     let captured: CapturedAudio
 
-    func startCapturing() async throws {
+    /// What this microphone hears the moment capture opens. A real one reports
+    /// as the buffers arrive; reporting them all at once is the same thing to
+    /// the core, and it happens when the test says so rather than when a
+    /// scheduler gets round to it.
+    var hearsLevels: [InputLevel] = []
+
+    func startCapturing(reporting report: @escaping @Sendable (InputLevel) async -> Void)
+        async throws
+    {
         await journal.record(.capturingStarted)
+        for level in hearsLevels {
+            await report(level)
+        }
     }
 
     func stopCapturing() async throws -> CapturedAudio {

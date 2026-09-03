@@ -27,8 +27,11 @@ jobs:
       - name: The Engine Download is the only network path
         run: ./Scripts/check-the-download-is-the-only-network-path.sh
 
-      # No Engine downloaded and no model on this runner: the suite has to be
-      # green all the same, which is the whole point of the ports.
+      - name: No audio reaches the disk
+        run: ./Scripts/check-no-audio-reaches-the-disk.sh
+
+      # No Engine downloaded, no model and no microphone on this runner: the
+      # suite has to be green all the same, which is the whole point of the ports.
       - name: Core suite
         run: swift test
 
@@ -37,3 +40,8 @@ jobs:
 
       - name: The app is a menu bar app
         run: test "$(plutil -extract LSUIElement raw dist/Cheppu.app/Contents/Info.plist)" = "true"
+
+      # Without this, macOS refuses the request rather than asking, and the
+      # first Dictation fails with no prompt the user could have said yes to.
+      - name: The bundle says why it wants the Microphone
+        run: test -n "$(plutil -extract NSMicrophoneUsageDescription raw dist/Cheppu.app/Contents/Info.plist)"
