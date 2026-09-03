@@ -20,6 +20,9 @@ extension [DictationEffect] {
 struct DictationMachineTests {
     private let spokenAudio = CapturedAudio(samples: [0.1, -0.2, 0.3], sampleRate: 16_000)
 
+    private let mail = ATargetApp.mail
+    private let browser = ATargetApp.browser
+
     private let heardWords = RawTranscript(
         text: "hello there",
         words: [
@@ -33,6 +36,7 @@ struct DictationMachineTests {
     private func aWholeDictation(_ machine: inout DictationMachine) -> [DictationEffect] {
         machine.receive(.activationToggled)
             + machine.receive(.activationToggled)
+            + machine.receive(.targetAppNoted(mail))
             + machine.receive(.audioCaptured(spokenAudio))
             + machine.receive(.rawTranscriptReceived(heardWords))
             + machine.receive(.insertionSucceeded)
@@ -47,12 +51,13 @@ struct DictationMachineTests {
                 .startCapturing,
                 .playCue(.dictationStarted),
                 .showPill(.listening(.silent)),
+                .noteTargetApp,
                 .stopCapturing,
                 .playCue(.dictationStopped),
                 .showPill(.transcribing),
                 .transcribe(spokenAudio),
                 .recordInHistory(FinalText("hello there")),
-                .insert(FinalText("hello there")),
+                .insert(FinalText("hello there"), into: mail),
                 .hidePill,
             ]
         )
@@ -92,6 +97,7 @@ struct DictationMachineTests {
         var machine = DictationMachine()
         _ = machine.receive(.activationStarted)
         _ = machine.receive(.activationStopped)
+        _ = machine.receive(.targetAppNoted(mail))
         _ = machine.receive(.audioCaptured(spokenAudio))
 
         let effects = machine.receive(.rawTranscriptReceived(heardWords))
@@ -99,7 +105,7 @@ struct DictationMachineTests {
         #expect(
             effects.decides(
                 .recordInHistory(FinalText("hello there")),
-                before: .insert(FinalText("hello there"))
+                before: .insert(FinalText("hello there"), into: mail)
             )
         )
     }
@@ -109,6 +115,7 @@ struct DictationMachineTests {
         var machine = DictationMachine()
         _ = machine.receive(.activationStarted)
         _ = machine.receive(.activationStopped)
+        _ = machine.receive(.targetAppNoted(mail))
         _ = machine.receive(.audioCaptured(spokenAudio))
 
         #expect(!machine.receive(.rawTranscriptReceived(heardWords)).contains(.hidePill))
@@ -139,6 +146,7 @@ struct DictationMachineTests {
             .showPill(.listening(.silent)),
         ])
         #expect(machine.receive(.activationToggled) == [
+            .noteTargetApp,
             .stopCapturing,
             .playCue(.dictationStopped),
             .showPill(.transcribing),
@@ -184,6 +192,7 @@ struct DictationMachineTests {
 
         #expect(machine.receive(.activationStarted).isEmpty)
         #expect(machine.receive(.activationStopped) == [
+            .noteTargetApp,
             .stopCapturing,
             .playCue(.dictationStopped),
             .showPill(.transcribing),
@@ -250,5 +259,102 @@ struct DictationMachineTests {
         let first = aWholeDictation(&machine)
 
         #expect(aWholeDictation(&machine) == first)
+    }
+
+    @Test("A Dictation notes its Target App the moment it stops, before it does anything else")
+    func aDictationNotesItsTargetAppTheMomentItStops() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationStarted)
+
+        // The Target App is whoever has focus at that instant, so it is read
+        // before the microphone is closed and the Cue is played — both of which
+        // take long enough for the user to have clicked somewhere else.
+        #expect(machine.receive(.activationStopped).first == .noteTargetApp)
+    }
+
+    @Test("The Final Text goes to the app that was focused when the Dictation stopped")
+    func theFinalTextGoesToTheAppThatWasFocusedWhenTheDictationStopped() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationStarted)
+        _ = machine.receive(.activationStopped)
+        _ = machine.receive(.targetAppNoted(browser))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        #expect(
+            machine.receive(.rawTranscriptReceived(heardWords))
+                .contains(.insert(FinalText("hello there"), into: browser)))
+    }
+
+    @Test("The Target App one Dictation noted is never the next one's")
+    func theTargetAppOneDictationNotedIsNeverTheNextOnes() {
+        var machine = DictationMachine()
+        _ = aWholeDictation(&machine)
+
+        _ = machine.receive(.activationToggled)
+        _ = machine.receive(.activationToggled)
+        _ = machine.receive(.targetAppNoted(browser))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        #expect(
+            machine.receive(.rawTranscriptReceived(heardWords)) == [
+                .recordInHistory(FinalText("hello there")),
+                .insert(FinalText("hello there"), into: browser),
+            ])
+    }
+
+    @Test("A Dictation with no app to insert into keeps the words and ends")
+    func aDictationWithNoAppToInsertIntoKeepsTheWordsAndEnds() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationStarted)
+        _ = machine.receive(.activationStopped)
+        _ = machine.receive(.targetAppNoted(nil))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        // Nothing had focus, so there is nowhere for the words to be typed.
+        // They are still the user's: History is written all the same, and the
+        // Dictation ends rather than waiting for an Insertion that cannot come.
+        // Telling the user, and leaving the text on the clipboard, is #14's.
+        #expect(
+            machine.receive(.rawTranscriptReceived(heardWords)) == [
+                .recordInHistory(FinalText("hello there")),
+                .hidePill,
+            ])
+        #expect(machine.receive(.activationToggled) == [
+            .startCapturing,
+            .playCue(.dictationStarted),
+            .showPill(.listening(.silent)),
+        ])
+    }
+
+    @Test("Final Text never carries the whitespace the Engine left around it")
+    func finalTextNeverCarriesTheWhitespaceTheEngineLeftAroundIt() {
+        var machine = DictationMachine()
+        _ = machine.receive(.activationStarted)
+        _ = machine.receive(.activationStopped)
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        let spacedOut = RawTranscript(text: "  hello there\n", words: heardWords.words)
+
+        // Inserted into the middle of a sentence, the Engine's own leading
+        // space would double the one already in front of the cursor. History
+        // keeps what was said, whitespace and all, so that Cleanup can go on
+        // promising that with every rule off the Final Text is the Raw
+        // Transcript byte for byte (#11).
+        #expect(
+            machine.receive(.rawTranscriptReceived(spacedOut)) == [
+                .recordInHistory(FinalText("  hello there\n")),
+                .insert(FinalText("hello there"), into: mail),
+            ])
+    }
+
+    @Test("A Target App noted out of turn changes nothing")
+    func aTargetAppNotedOutOfTurnChangesNothing() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.targetAppNoted(mail)).isEmpty)
+
+        _ = machine.receive(.activationStarted)
+        #expect(machine.receive(.targetAppNoted(mail)).isEmpty)
     }
 }

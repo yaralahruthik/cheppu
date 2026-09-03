@@ -31,11 +31,15 @@ struct DictationCoreTests {
 
     private static let aTuesdayAfternoon = Date(timeIntervalSince1970: 1_700_000_000)
 
+    private static let mail = ATargetApp.mail
+    private static let browser = ATargetApp.browser
+
     /// A core wired to fakes, plus the journal they all write to.
     private struct Scenario {
         let journal: PortJournal
         let clock: FakeClock
         let hotkey: FakeHotkey
+        let focus: FakeFocus
         let core: DictationCore
 
         init(
@@ -43,25 +47,39 @@ struct DictationCoreTests {
             captures: CapturedAudio = DictationCoreTests.spokenAudio,
             hearsLevels: [InputLevel] = [],
             now: Date = DictationCoreTests.aTuesdayAfternoon,
-            insertionRefuses: Bool = false,
+            typingIn app: TargetApp? = DictationCoreTests.mail,
+            insertion: FakeInsertion.Outcome = .lands,
             isAccessibilityGranted: Bool = true
         ) {
             let journal = PortJournal()
             let clock = FakeClock(reading: now)
             let hotkey = FakeHotkey(isAccessibilityGranted: isAccessibilityGranted)
+            let focus = FakeFocus(on: app)
             self.journal = journal
             self.clock = clock
             self.hotkey = hotkey
+            self.focus = focus
             self.core = DictationCore(
                 hotkey: hotkey,
                 audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
-                insertion: insertionRefuses ? RefusingInsertion() : FakeInsertion(journal: journal),
+                insertion: FakeInsertion(journal: journal, focus: focus, outcome: insertion),
                 clipboard: FakeClipboard(),
                 history: FakeHistory(journal: journal),
                 feedback: FakeFeedback(journal: journal),
                 clock: clock
             )
+        }
+
+        /// Every Final Text the Dictation put somewhere, as the user would read
+        /// it, in the order it was inserted.
+        var insertedText: [String] {
+            get async {
+                await journal.calls.compactMap { call in
+                    guard case .inserted(let finalText, _) = call else { return nil }
+                    return finalText.text
+                }
+            }
         }
 
         /// Taps the Hotkey, speaks, and taps it again.
@@ -99,7 +117,7 @@ struct DictationCoreTests {
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
                 ),
-                .inserted(FinalText("hello there")),
+                .inserted(FinalText("hello there"), into: Self.mail),
                 .pillHidden,
             ]
         )
@@ -137,7 +155,7 @@ struct DictationCoreTests {
 
         try await scenario.toggleADictation()
 
-        #expect(await scenario.journal.calls.contains(.inserted(FinalText("hello there"))))
+        #expect(await scenario.journal.calls.contains(.inserted(FinalText("hello there"), into: Self.mail)))
     }
 
     @Test("A Toggle Activation, from the tap to the words landing")
@@ -158,7 +176,7 @@ struct DictationCoreTests {
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
                 ),
-                .inserted(FinalText("hello there")),
+                .inserted(FinalText("hello there"), into: Self.mail),
                 .pillHidden,
             ]
         )
@@ -194,7 +212,7 @@ struct DictationCoreTests {
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon)
                 ),
-                before: .inserted(FinalText("hello there"))
+                before: .inserted(FinalText("hello there"), into: Self.mail)
             )
         )
     }
@@ -216,9 +234,9 @@ struct DictationCoreTests {
 
     @Test("A Dictation whose Insertion fails still ends, so the next tap is not met with a dead app")
     func aDictationWhoseInsertionFailsStillEnds() async throws {
-        let scenario = Scenario(insertionRefuses: true)
+        let scenario = Scenario(insertion: .refuses)
 
-        await #expect(throws: RefusingInsertion.Refused.self) {
+        await #expect(throws: FakeInsertion.Refused.self) {
             try await scenario.toggleADictation()
         }
 
@@ -264,7 +282,75 @@ struct DictationCoreTests {
         try await scenario.toggleADictation()
         try await scenario.toggleADictation()
 
-        let insertions = await scenario.journal.calls.filter { $0 == .inserted(FinalText("hello there")) }
+        let insertions = await scenario.journal.calls.filter {
+            $0 == .inserted(FinalText("hello there"), into: Self.mail)
+        }
         #expect(insertions.count == 2)
+    }
+
+    @Test("The Target App is the app focused when the Dictation stops, not when it started")
+    func theTargetAppIsTheAppFocusedWhenTheDictationStops() async throws {
+        let scenario = Scenario(typingIn: Self.mail)
+
+        try await scenario.core.receive(.activationToggled)
+        // The user carries on speaking while they click into another app, which
+        // is where they meant the words to go.
+        await scenario.focus.moveTo(Self.browser)
+        try await scenario.core.receive(.activationToggled)
+
+        #expect(
+            await scenario.journal.calls.contains(
+                .inserted(FinalText("hello there"), into: Self.browser)))
+    }
+
+    @Test("A Dictation whose Target App lost focus keeps the words rather than misplacing them")
+    func aDictationWhoseTargetAppLostFocusKeepsTheWords() async throws {
+        let scenario = Scenario(insertion: .findsTheFocusMoved)
+
+        await #expect(throws: InsertionFailure.focusMoved) {
+            try await scenario.toggleADictation()
+        }
+
+        #expect(await scenario.insertedText.isEmpty)
+        // The words are still the user's: History was written before the
+        // Insertion was tried, and the Dictation ended rather than hanging.
+        #expect(
+            await scenario.journal.calls.contains(
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon))))
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("A Dictation with no app to insert into still keeps the words")
+    func aDictationWithNoAppToInsertIntoStillKeepsTheWords() async throws {
+        let scenario = Scenario(typingIn: nil)
+
+        try await scenario.toggleADictation()
+
+        #expect(await scenario.insertedText.isEmpty)
+        #expect(
+            await scenario.journal.calls.contains(
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("hello there"), recordedAt: Self.aTuesdayAfternoon))))
+        #expect(await scenario.journal.calls.last == .pillHidden)
+
+        // And the Dictation ended, so the next tap of the Hotkey starts one
+        // rather than trying to stop the one that never finished.
+        try await scenario.core.receive(.activationToggled)
+        let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
+        #expect(timesCaptureOpened == 2)
+    }
+
+    @Test("Dictating mid-sentence joins to what is around it rather than doubling a space")
+    func dictatingMidSentenceJoinsToWhatIsAroundIt() async throws {
+        // Parakeet hands back a leading space and a trailing newline often
+        // enough that a Dictation into the middle of a sentence would arrive
+        // with a doubled space in front of it and a line break behind it.
+        let scenario = Scenario(
+            hears: RawTranscript(text: " hello there\n", words: Self.heardWords.words))
+
+        try await scenario.toggleADictation()
+
+        #expect(await scenario.insertedText == ["hello there"])
     }
 }

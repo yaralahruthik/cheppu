@@ -101,9 +101,26 @@ public protocol EngineDownloadPort: Sendable {
 
 /// Placing Final Text at the text cursor of the Target App.
 public protocol InsertionPort: Sendable {
-    /// Inserts the Final Text as if it had been typed. Throwing means it did not
-    /// land, and the Clipboard Fallback ticket decides what happens then.
-    func insert(_ finalText: FinalText) async throws
+    /// Which app has keyboard focus this instant, or nothing if none has.
+    ///
+    /// Asked when the Dictation stops, which is what makes the Target App the
+    /// app the user was in when they finished speaking rather than the one they
+    /// started in.
+    func focusedApp() async -> TargetApp?
+
+    /// Inserts the Final Text at the text cursor of the Target App, as if it
+    /// had been typed.
+    ///
+    /// The Target App is passed rather than looked up again because the
+    /// Insertion is *for* that app: throwing `InsertionFailure.focusMoved`
+    /// where it is no longer the app with focus is what stops a Dictation
+    /// landing in whichever window came to the front while the Engine was
+    /// working. The check belongs next to the keystroke rather than up here,
+    /// where anything between the two would be a window for focus to move in.
+    ///
+    /// Throwing means it did not land, and the Clipboard Fallback ticket
+    /// decides what the user is told about that.
+    func insert(_ finalText: FinalText, into targetApp: TargetApp) async throws
 }
 
 /// The pasteboard, which Cheppu borrows and gives back.

@@ -58,6 +58,27 @@ public struct FinalText: Equatable, Sendable {
     public init(_ text: String) {
         self.text = text
     }
+
+    /// The same words with no whitespace of their own at either end, which is
+    /// how they go into the Target App.
+    ///
+    /// The Engine hands back a leading space and a trailing newline often
+    /// enough that dictating into the middle of a sentence would double the
+    /// space already in front of the cursor and leave a line break behind the
+    /// words. Cheppu cannot read what surrounds the cursor — that would mean
+    /// reading the user's document in order to insert into it — so what joins
+    /// sensibly is to contribute no whitespace of its own and let the sentence
+    /// the user is already writing supply the spaces
+    /// (`docs/product-experience.md` §5).
+    ///
+    /// Applied at the Insertion boundary rather than to the Final Text itself,
+    /// which is where Terminal awareness will be applied too (#12): what is
+    /// kept is what was said, and what is typed is what fits where it is going.
+    /// It is also what leaves Cleanup free to promise that with every rule off
+    /// the Final Text is the Raw Transcript, byte for byte (#11).
+    public var normalisedForInsertion: FinalText {
+        FinalText(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
 }
 
 /// One line of History: what was said, and when.

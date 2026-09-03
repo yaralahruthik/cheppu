@@ -51,11 +51,6 @@ public actor DictationCore {
     /// Throwing means the Hotkey cannot be watched —
     /// `HotkeyFailure.accessibilityDenied` — which the app says out loud rather
     /// than leaving the user with a key that does nothing.
-    ///
-    /// The app cannot call this yet, because a core needs an Insertion for a
-    /// Dictation to end in and that is #7. Until then it watches the Hotkey
-    /// itself, for the Accessibility half of this, and the suite is what drives
-    /// a Dictation from a tap.
     public func watchForActivations() async throws {
         try await hotkey.observe { [weak self] gesture in
             await self?.activated(by: gesture)
@@ -146,6 +141,9 @@ public actor DictationCore {
         case .stopCapturing:
             return .audioCaptured(try await audio.stopCapturing())
 
+        case .noteTargetApp:
+            return .targetAppNoted(await insertion.focusedApp())
+
         case .transcribe(let spoken):
             return .rawTranscriptReceived(try await engine.transcribe(spoken))
 
@@ -166,8 +164,8 @@ public actor DictationCore {
             try await history.append(entry)
             return nil
 
-        case .insert(let finalText):
-            try await insertion.insert(finalText)
+        case .insert(let finalText, let targetApp):
+            try await insertion.insert(finalText, into: targetApp)
             return .insertionSucceeded
         }
     }
