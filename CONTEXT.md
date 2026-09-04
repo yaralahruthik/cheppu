@@ -89,7 +89,7 @@ How loud the microphone is hearing, from silence to the loudest it can hear, rep
 _Avoid_: volume, amplitude, meter, VU
 
 **Cue**:
-A short sound played when a Dictation starts, when it stops, and when it is Cancelled. The Cancel Cue is distinct from the stop Cue, which says the words are on their way.
+A short sound played when a Dictation starts, when it stops, and when it is Cancelled. The Cancel Cue is distinct from the stop Cue, which says the words are on their way. Cues can be turned off, for dictating in a room with other people in it, and off is silent rather than quieter; the Pill cannot be turned off (ADR-0007).
 _Avoid_: beep, chime, sound effect
 
 **History**:

@@ -177,9 +177,17 @@ actor FakeClipboard: ClipboardPort {
 
 /// History in memory.
 struct FakeHistory: HistoryPort {
+    /// A History that will not take what it is handed — a disk that is full,
+    /// or a store that cannot be opened. What the user is told about that is
+    /// #13's and #14's; what it is here for is that a Dictation which fails on
+    /// its way out still ends.
+    struct Refused: Error {}
+
     let journal: PortJournal
+    var refuses = false
 
     func append(_ entry: HistoryEntry) async throws {
+        guard !refuses else { throw Refused() }
         await journal.record(.appendedToHistory(entry))
     }
 }

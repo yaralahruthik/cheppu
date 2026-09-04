@@ -131,7 +131,11 @@ public enum PillState: Equatable, Sendable {
 }
 
 /// A short sound marking the edge of a Dictation, so one can be run by feel.
-public enum Cue: Equatable, Sendable {
+///
+/// Every one of them can be listed, because whatever renders them has to make
+/// one sound per Cue and a list kept by hand somewhere else would be a Cue
+/// added here and silent there.
+public enum Cue: Equatable, Sendable, CaseIterable {
     case dictationStarted
     case dictationStopped
 

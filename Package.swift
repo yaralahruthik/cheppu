@@ -58,11 +58,23 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // The Pill and the Cues: the one place Cheppu draws over another app's
+        // window and the one place it makes a sound. A target of its own rather
+        // than part of the app so that where the Pill goes so as not to cover
+        // what the user is dictating into, what each Cue sounds like, and what
+        // "Cues off" means are testable with no screen to put a panel on and
+        // nothing audible ever leaving the suite.
+        .target(
+            name: "CheppuFeedback",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
             dependencies: [
                 "CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard", "CheppuInsertion",
+                "CheppuFeedback",
             ]
         ),
 
@@ -89,6 +101,11 @@ let package = Package(
         .testTarget(
             name: "CheppuInsertionTests",
             dependencies: ["CheppuInsertion"]
+        ),
+
+        .testTarget(
+            name: "CheppuFeedbackTests",
+            dependencies: ["CheppuFeedback"]
         ),
     ],
     swiftLanguageModes: [.v6]
