@@ -10,9 +10,12 @@ import Testing
 // the machine running the suite, and nothing here types anywhere.
 @Suite("Paste Insertion")
 struct PasteInsertionTests {
-    private static let mail = TargetApp(bundleIdentifier: "com.apple.mail", processIdentifier: 501)
+    private static let mail = TargetApp(
+        bundleIdentifier: "com.apple.mail", processIdentifier: 501,
+        focusedElementRole: "AXTextArea")
     private static let browser = TargetApp(
-        bundleIdentifier: "com.apple.Safari", processIdentifier: 502)
+        bundleIdentifier: "com.apple.Safari", processIdentifier: 502,
+        focusedElementRole: "AXTextField")
 
     /// What the user had copied before they dictated: a screenshot, which no
     /// amount of putting a string back would restore.
@@ -99,6 +102,23 @@ struct PasteInsertionTests {
         // happen costs the user nothing at all.
         #expect(scenario.pasteboard.wasBorrowedFor.isEmpty)
         #expect(scenario.pasteboard.contents() == Self.aScreenshot)
+    }
+
+    @Test("Clicking around inside the Target App is not focus moving")
+    func clickingAroundInsideTheTargetAppIsNotFocusMoving() async throws {
+        let scenario = Scenario(typingIn: Self.mail)
+
+        // The user clicked from the message body into the subject line while the
+        // Engine worked. It is the same app and the same window, and the only
+        // thing that changed is what kind of thing the keyboard is pointing at.
+        scenario.focus.moveTo(
+            TargetApp(
+                bundleIdentifier: "com.apple.mail", processIdentifier: 501,
+                focusedElementRole: "AXTextField"))
+
+        try await scenario.insertion.insert(Self.hello, into: Self.mail)
+
+        #expect(scenario.keystrokes.pastedText == [Self.hello.text])
     }
 
     @Test("An Insertion with nothing focused at all is abandoned")

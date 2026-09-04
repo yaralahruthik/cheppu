@@ -72,12 +72,50 @@ public struct FinalText: Equatable, Sendable {
     /// (`docs/product-experience.md` §5).
     ///
     /// Applied at the Insertion boundary rather than to the Final Text itself,
-    /// which is where Terminal awareness will be applied too (#12): what is
-    /// kept is what was said, and what is typed is what fits where it is going.
-    /// It is also what leaves Cleanup free to promise that with every rule off
-    /// the Final Text is the Raw Transcript, byte for byte (#11).
+    /// which is where Terminal awareness is applied too (#12): what is kept is
+    /// what was said, and what is typed is what fits where it is going. It is
+    /// also what leaves Cleanup free to promise that with every rule off the
+    /// Final Text is the Raw Transcript, byte for byte (#11).
     public var normalisedForInsertion: FinalText {
         FinalText(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// The same words as they go into this Target App in particular: normalised
+    /// as above, and with every Paragraph Break flattened to a single space
+    /// where the words are going into a Terminal.
+    ///
+    /// A newline in a Terminal is Return, so a Paragraph Break inserted into one
+    /// runs whatever is on the line. Nothing is dropped to avoid that — the
+    /// break becomes the space it was made from, so the two sentences read as
+    /// one paragraph rather than losing the join altogether.
+    ///
+    /// It happens here rather than in a Cleanup rule, which is the whole of what
+    /// #12 decides. Cleanup is a pure function of the transcript and the user's
+    /// switches, and the Target App is not known until the Dictation stops; a
+    /// rule that changed with which window was in front would be a rule the user
+    /// could not predict from its one-line description
+    /// (`docs/product-experience.md` §8). So History keeps the Paragraph Breaks
+    /// and the Terminal never sees them.
+    ///
+    /// Every newline goes, not only the ones Cleanup put there. With the
+    /// Paragraph Break rule off the Final Text is the Raw Transcript byte for
+    /// byte, and a newline the Engine wrote is exactly as dangerous as one
+    /// Cheppu wrote.
+    ///
+    /// A break becomes one space however much whitespace was wrapped around it.
+    /// A Paragraph Break has none — Cleanup makes it out of the space that was
+    /// there — but a blank line the Engine wrote, or a newline it left a space
+    /// in front of, would otherwise arrive as two or three spaces in the middle
+    /// of a command.
+    public func normalisedForInsertion(into targetApp: TargetApp) -> FinalText {
+        let normalised = normalisedForInsertion
+        guard targetApp.isATerminal else { return normalised }
+
+        let lines = normalised.text
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return FinalText(lines.joined(separator: " "))
     }
 }
 

@@ -61,7 +61,14 @@ public actor PasteInsertion: InsertionPort {
         // it. What remains between here and the keystroke is a few microseconds
         // of the same process, which is as close as anything can get to sending
         // a keystroke and knowing where it went.
-        guard await focus.focusedApp() == targetApp else { throw InsertionFailure.focusMoved }
+        //
+        // The same *app*, rather than the same reading of focus: the user
+        // clicking from the field they dictated into to the button beside it has
+        // not moved to another window, and the words still belong where they
+        // were going.
+        guard await focus.focusedApp()?.isTheSameAppAs(targetApp) == true else {
+            throw InsertionFailure.focusMoved
+        }
 
         let borrowed = pasteboard.contents()
         pasteboard.replace(with: finalText.text)

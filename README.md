@@ -34,7 +34,7 @@ Press Escape while listening to cancel: the audio is thrown away and nothing is 
 - A recording pill with input level, plus start and stop sounds that can be turned off from the menu bar ([ADR-0007](./docs/adr/0007-the-cues-can-be-silenced-and-the-pill-cannot.md)).
 - Text-only History of recent dictations. Audio is discarded after transcription.
 - A settings window that fits on one screen: hotkey, cleanup toggles, sounds, launch at login, permissions status, and History.
-- Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command.
+- Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command. An emulator Cheppu has never heard of is treated as one too ([ADR-0008](./docs/adr/0008-terminals-are-found-by-what-a-text-surface-looks-like.md)).
 - A first-run flow that requests permissions, downloads the model, and has you dictate one sentence before you use it anywhere else.
 - Signed and notarized builds via GitHub Releases and Homebrew, with in-app updates via Sparkle.
 - No telemetry and no crash reporter. A local log file, never containing audio or text, is the whole diagnostic story.
@@ -80,6 +80,7 @@ swift test                      # run the suite
 ./Scripts/check-cheppu-types-one-keystroke.sh
 ./Scripts/check-cheppu-tells-one-key-apart.sh
 ./Scripts/check-the-pill-never-takes-focus.sh
+./Scripts/check-cleanup-is-a-pure-function.sh
 ```
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
