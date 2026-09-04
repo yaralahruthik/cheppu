@@ -47,4 +47,25 @@ if [ -n "$FOUND" ]; then
 	exit 1
 fi
 
+# And it does not know where the words are going. Terminal awareness (#12) is
+# applied at the Insertion boundary rather than inside a rule, so that what is
+# kept is what was said and a rule stays predictable from its one-line
+# description whatever window happens to be in front. A rule that read the
+# Target App would be the one way of making the same Raw Transcript give two
+# different Final Texts that none of the checks above would catch.
+#
+# Code only, unlike the two checks above: a comment in a rule saying where
+# Terminal awareness lives instead is the sort of thing this file's own prose
+# asks for, and failing the build over it would teach the next person to leave
+# the explanation out.
+WHERE_THE_WORDS_ARE_GOING='TargetApp|isATerminal|Terminal\b'
+
+FOUND=$(grep -rnE --include='*.swift' "\b($WHERE_THE_WORDS_ARE_GOING)" "$CLEANUP" |
+	grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*)' || true)
+if [ -n "$FOUND" ]; then
+	echo "$FOUND"
+	echo "error: Cleanup does not know where the words are going — Terminal awareness belongs at the Insertion boundary (ADR-0008)" >&2
+	exit 1
+fi
+
 echo "Cleanup is a pure function."

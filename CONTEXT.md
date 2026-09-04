@@ -82,6 +82,10 @@ _Avoid_: line break, pause detection
 The application that has keyboard focus at the moment the Dictation stops, and that receives the Insertion.
 _Avoid_: destination, frontmost app, active window
 
+**Terminal**:
+A Target App where a newline is Return rather than a line break, so a Paragraph Break inserted into one would run a command the user did not type. Every Paragraph Break becomes a single space before Insertion into one, at the Insertion boundary and never in a Cleanup rule — what is kept is what was said. Known by a committed list of bundle identifiers, and otherwise by the keyboard not pointing at anything Cheppu recognises as somewhere text is written, so an emulator nobody has named yet — or one too busy to answer — is treated as one (ADR-0008).
+_Avoid_: shell, console, command line
+
 ### Feedback and memory
 
 **Pill**:

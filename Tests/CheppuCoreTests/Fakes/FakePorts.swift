@@ -91,11 +91,29 @@ struct FakeEngine: EnginePort {
     }
 }
 
-/// The two apps the user is working in: the one they were writing an email in,
-/// and the one they switched to.
+/// The apps the user is working in: the one they were writing an email in, the
+/// one they switched to, and the two they run commands in.
 enum ATargetApp {
-    static let mail = TargetApp(bundleIdentifier: "com.apple.mail", processIdentifier: 501)
-    static let browser = TargetApp(bundleIdentifier: "com.apple.Safari", processIdentifier: 502)
+    static let mail = TargetApp(
+        bundleIdentifier: "com.apple.mail", processIdentifier: 501,
+        focusedElementRole: "AXTextArea")
+
+    static let browser = TargetApp(
+        bundleIdentifier: "com.apple.Safari", processIdentifier: 502,
+        focusedElementRole: "AXTextField")
+
+    /// A Terminal Cheppu knows by name, exposing the same ordinary text area as
+    /// the mail window above. Being on the list is what tells them apart.
+    static let terminal = TargetApp(
+        bundleIdentifier: "com.apple.Terminal", processIdentifier: 503,
+        focusedElementRole: "AXTextArea")
+
+    /// A Terminal Cheppu has never heard of, which draws its own screen and so
+    /// exposes no focused element to ask about. Nobody has to have added it to a
+    /// list for a newline to be dangerous in it.
+    static let anUnfamiliarTerminal = TargetApp(
+        bundleIdentifier: "com.example.SomeoneElsesTerminal", processIdentifier: 504,
+        focusedElementRole: nil)
 }
 
 /// Raw Transcripts to put in the Engine's mouth.

@@ -359,9 +359,14 @@ public struct DictationMachine: Sendable {
             state = .inserting
             // History first, always: a crash during Insertion then costs the
             // user an inconvenience rather than the thing they said.
+            //
+            // History is given the Final Text and the Target App a version of it
+            // shaped for where it is going — trimmed, and with its Paragraph
+            // Breaks flattened where that is a Terminal (#12). What is kept is
+            // what was said; what is typed is what is safe to type there.
             return [
                 .recordInHistory(finalText),
-                .insert(finalText.normalisedForInsertion, into: targetApp),
+                .insert(finalText.normalisedForInsertion(into: targetApp), into: targetApp),
             ]
 
         case (.inserting, .insertionSucceeded):

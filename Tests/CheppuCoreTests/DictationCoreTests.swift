@@ -202,6 +202,72 @@ struct DictationCoreTests {
             ))
     }
 
+    @Test("Dictating into a Terminal never puts a newline in it")
+    func dictatingIntoATerminalNeverPutsANewlineInIt() async throws {
+        let scenario = Scenario(
+            hears: ARawTranscript.saidWithAPause, typingIn: ATargetApp.terminal)
+
+        try await scenario.toggleADictation()
+
+        // The same Dictation that lands in a mail window with a Paragraph Break
+        // in it lands here as one line: a newline in a Terminal is Return, and
+        // it would run whatever was on the line. The break becomes the space it
+        // was made from rather than being dropped, so nothing the user said is
+        // lost and nothing runs.
+        #expect(await scenario.insertedText == ["That is one thought. The next one"])
+
+        // And Cleanup's output is untouched by where the words were going.
+        // History keeps what was said, not what was safe to type.
+        #expect(
+            await scenario.journal.calls.contains(
+                .appendedToHistory(
+                    HistoryEntry(
+                        finalText: FinalText("That is one thought.\nThe next one"),
+                        recordedAt: Self.aTuesdayAfternoon
+                    )
+                )
+            ))
+    }
+
+    @Test("A Terminal Cheppu has never heard of is still a Terminal")
+    func aTerminalCheppuHasNeverHeardOfIsStillATerminal() async throws {
+        let scenario = Scenario(
+            hears: ARawTranscript.saidWithAPause, typingIn: ATargetApp.anUnfamiliarTerminal)
+
+        try await scenario.toggleADictation()
+
+        // Nobody added this one to the list, and it is treated as a Terminal all
+        // the same: it exposes no focused element, so Cheppu does not know that
+        // the keyboard is pointing at a place text is written, and the
+        // behaviour it falls back to is the safe one.
+        #expect(await scenario.insertedText == ["That is one thought. The next one"])
+    }
+
+    @Test("Even with the Paragraph Break rule off, no newline reaches a Terminal")
+    func evenWithTheParagraphBreakRuleOffNoNewlineReachesATerminal() async throws {
+        // A Raw Transcript with the Engine's own newline in the middle of it,
+        // and every Cleanup rule off — so the Final Text is the Raw Transcript
+        // byte for byte, newline and all.
+        let scenario = Scenario(
+            hears: RawTranscript(
+                text: "ls\nrm -rf /",
+                words: [
+                    WordTiming(word: "ls", start: .zero, end: .milliseconds(200)),
+                    WordTiming(word: "rm -rf /", start: .seconds(3), end: .seconds(4)),
+                ]
+            ),
+            typingIn: ATargetApp.terminal,
+            cleaningWith: .off
+        )
+
+        try await scenario.toggleADictation()
+
+        // A newline the Engine wrote is exactly as dangerous as one Cheppu
+        // wrote, so the boundary flattens every one of them rather than only the
+        // Paragraph Breaks it knows it made.
+        #expect(await scenario.insertedText == ["ls rm -rf /"])
+    }
+
     @Test("With every Cleanup rule off, what lands is the Raw Transcript")
     func withEveryCleanupRuleOffWhatLandsIsTheRawTranscript() async throws {
         let scenario = Scenario(hears: ARawTranscript.saidWithAPause, cleaningWith: .off)
