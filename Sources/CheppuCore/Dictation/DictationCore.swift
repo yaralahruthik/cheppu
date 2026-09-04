@@ -80,9 +80,9 @@ public actor DictationCore {
     ///
     /// It does not throw where `receive(_:)` does, for the same reason `hear(_:)`
     /// does not: the keyboard has nowhere to put an error it was handed back
-    /// between two Dictations, and the press that failed is already over. What
-    /// the user is told about a Dictation that failed is the Clipboard Fallback
-    /// ticket's.
+    /// between two Dictations, and the press that failed is already over. The
+    /// failure the user is told about — an Insertion that did not land — never
+    /// arrives here as an error at all.
     private func activated(by gesture: HotkeyEvent) async {
         switch gesture {
         case .pressed:
@@ -137,9 +137,10 @@ public actor DictationCore {
     /// waits its turn rather than interleaving with it, and returns once queued.
     ///
     /// A port that throws ends that Dictation: the Pill comes down, the machine
-    /// returns to Idle, and the error is passed on. Turning the failure into
-    /// Clipboard Fallback, and telling the user about it, is the Clipboard
-    /// Fallback ticket's job.
+    /// returns to Idle, and the error is passed on. The Insertion is the one
+    /// exception, and it is the reason the rest can be this blunt — an
+    /// Insertion that did not land is answered rather than thrown, with the
+    /// words on the clipboard and the Pill saying so.
     public func receive(_ event: DictationEvent) async throws {
         queued.append(event)
         guard !isDraining else { return }
@@ -172,10 +173,18 @@ public actor DictationCore {
     ///
     /// It does not throw where `receive(_:)` does, for the same reason `hear(_:)`
     /// does not: the Clock has nowhere to put an error it was handed back, and
-    /// the Dictation the Cap ended is the one that failed. What the user is told
-    /// about a Dictation that failed is the Clipboard Fallback ticket's.
+    /// the Dictation the Cap ended is the one that failed.
     private func capReached() async {
         try? await receive(.capReached)
+    }
+
+    /// Takes the end of the notice from the Clock.
+    ///
+    /// It does not throw where `receive(_:)` does, for the same reason
+    /// `capReached()` does not: the Clock has nowhere to put an error it was
+    /// handed back, and nothing taking the Pill down can fail in any case.
+    private func noticeRead() async {
+        try? await receive(.noticeRead)
     }
 
     /// Takes a level from whoever is holding the microphone.
@@ -239,12 +248,42 @@ public actor DictationCore {
 
         case .recordInHistory(let finalText):
             let entry = HistoryEntry(finalText: finalText, recordedAt: await clock.now())
-            try await history.append(entry)
+            // A History that will not take the words does not take the
+            // Dictation with it (ADR-0009). It is written first because it is
+            // the last resort, not because it is the point: a full disk must
+            // not also cost the user the Insertion, which is the one place the
+            // words were actually going. If the Insertion then fails too, the
+            // Clipboard Fallback is still there — so the words are lost only
+            // where every one of the three has gone wrong at once.
+            try? await history.append(entry)
             return nil
 
         case .insert(let finalText, let targetApp):
-            try await insertion.insert(finalText, into: targetApp)
-            return .insertionSucceeded
+            do {
+                try await insertion.insert(finalText, into: targetApp)
+                return .insertionSucceeded
+            } catch {
+                // Every way an Insertion does not land is the same way here,
+                // including one nothing in Cheppu has a name for. The words
+                // exist and were not typed, and what the user needs is the same
+                // in all of them; a fallback that only caught the two failures
+                // the core can name would be silence in the case nobody
+                // foresaw, which is the one `docs/product-experience.md` §4
+                // rules out.
+                return .insertionFailed
+            }
+
+        case .leaveOnTheClipboard(let finalText):
+            await clipboard.leave(finalText)
+            return nil
+
+        case .leaveTheNoticeUp:
+            // The waiting is the Clock's, as the Cap's is, and what comes back
+            // comes back through the same door every other event does.
+            await clock.waitOut(DictationMachine.longEnoughToReadTheNotice) { [weak self] in
+                await self?.noticeRead()
+            }
+            return nil
         }
     }
 }

@@ -163,18 +163,29 @@ actor FakeFocus {
 struct FakeInsertion: InsertionPort {
     /// What this Insertion does when it is finally asked to put the words
     /// somewhere.
-    enum Outcome {
+    ///
+    /// The three ways it does not land are here rather than one, because the
+    /// Clipboard Fallback's promise is that all three end the same way: the
+    /// words on the clipboard, in History, and said out loud. Two of them are
+    /// the core's own vocabulary and the third is an error it has never seen,
+    /// which is what says the fallback is what happens when an Insertion fails
+    /// rather than what happens when it fails in a way Cheppu recognises.
+    enum Outcome: Sendable {
         /// It lands, and the journal says where.
         case lands
 
-        /// It will not go through, for a reason the user is not told yet. What
-        /// they are told is the Clipboard Fallback ticket's; all this outcome
-        /// is for is showing that a Dictation which fails still ends.
+        /// The Target App would not take it, for a reason nothing here can
+        /// name.
         case refuses
 
         /// The user has moved to another app while the Engine worked, so it is
         /// abandoned rather than typed into the wrong window.
         case findsTheFocusMoved
+
+        /// The Accessibility that lets Cheppu type the paste was taken away
+        /// while the app was running, which is what a permission revoked
+        /// mid-session looks like from here.
+        case findsAccessibilityTakenAway
     }
 
     /// An Insertion that would not go through, whatever the reason.
@@ -196,33 +207,38 @@ struct FakeInsertion: InsertionPort {
             throw Refused()
         case .findsTheFocusMoved:
             throw InsertionFailure.focusMoved
+        case .findsAccessibilityTakenAway:
+            throw InsertionFailure.keystrokeRefused
         }
     }
 }
 
-/// A pasteboard that remembers one string.
+/// A pasteboard that remembers one string, so that a test can put something on
+/// it before a Dictation and read back what is there afterwards.
 actor FakeClipboard: ClipboardPort {
-    private var contents: String?
+    let journal: PortJournal
 
-    init(contents: String? = nil) {
+    /// What is on it this instant — what the user had copied, until a Dictation
+    /// that could not be typed leaves what they said there instead.
+    private(set) var contents: String?
+
+    init(journal: PortJournal, holding contents: String? = nil) {
+        self.journal = journal
         self.contents = contents
     }
 
-    func read() async -> String? {
-        contents
-    }
-
-    func write(_ text: String) async {
-        contents = text
+    func leave(_ finalText: FinalText) async {
+        contents = finalText.text
+        await journal.record(.leftOnTheClipboard(finalText))
     }
 }
 
 /// History in memory.
 struct FakeHistory: HistoryPort {
     /// A History that will not take what it is handed — a disk that is full,
-    /// or a store that cannot be opened. What the user is told about that is
-    /// #13's and #14's; what it is here for is that a Dictation which fails on
-    /// its way out still ends.
+    /// or a store that cannot be opened. What it is here for is that a store
+    /// which refuses costs the user the record and nothing else: the Insertion
+    /// is still attempted, and the Clipboard Fallback is still behind it.
     struct Refused: Error {}
 
     let journal: PortJournal

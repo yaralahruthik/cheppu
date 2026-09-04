@@ -59,7 +59,7 @@ Placing Final Text at the text cursor of the Target App as if the user had typed
 _Avoid_: pasting, typing, injection, output
 
 **Clipboard Fallback**:
-What happens when Insertion is not possible: Final Text is left on the clipboard and the Pill says so. Never silent.
+What happens when Insertion is not possible: the Final Text is left on the clipboard and the Pill says so. What is left is the text the Insertion was handed rather than the text History keeps — trimmed, and with its Paragraph Breaks already flattened where the Target App is a Terminal — because the user's next keystroke is the paste, and it goes into the window the Insertion was for. What could not be typed is what is left to paste. Never silent, and never lost — the words are in History before Insertion is ever attempted. Every way an Insertion fails to land ends here, including one Cheppu has no name for, and the user is told the same thing about all of them, because what they do about it is the same. The one path on which what was on the clipboard before is *not* put back: the words the user could not have typed for them are worth more than the thing they had copied.
 _Avoid_: copy mode, error
 
 **Cancel**:
@@ -83,13 +83,13 @@ The application that has keyboard focus at the moment the Dictation stops, and t
 _Avoid_: destination, frontmost app, active window
 
 **Terminal**:
-A Target App where a newline is Return rather than a line break, so a Paragraph Break inserted into one would run a command the user did not type. Every Paragraph Break becomes a single space before Insertion into one, at the Insertion boundary and never in a Cleanup rule — what is kept is what was said. Known by a committed list of bundle identifiers, and otherwise by the keyboard not pointing at anything Cheppu recognises as somewhere text is written, so an emulator nobody has named yet — or one too busy to answer — is treated as one (ADR-0008).
+A Target App where a newline is Return rather than a line break, so a Paragraph Break inserted into one would run a command the user did not type. Every Paragraph Break becomes a single space before Insertion into one, at the Insertion boundary and never in a Cleanup rule — what is kept is what was said. The Clipboard Fallback is the other side of that same boundary: a newline Cheppu would not type into a Terminal is not one it leaves there to be pasted either. Known by a committed list of bundle identifiers, and otherwise by the keyboard not pointing at anything Cheppu recognises as somewhere text is written, so an emulator nobody has named yet — or one too busy to answer — is treated as one (ADR-0008).
 _Avoid_: shell, console, command line
 
 ### Feedback and memory
 
 **Pill**:
-The small floating overlay that appears during a Dictation and shows its state and the live input level.
+The small floating overlay that appears during a Dictation and shows its state and the live input level. It draws the two states a Dictation is in while it runs and says the one it can end in — the Clipboard Fallback — in words, staying up long enough to be read before it goes.
 _Avoid_: HUD, overlay, indicator, widget
 
 **Input Level**:
@@ -99,6 +99,10 @@ _Avoid_: volume, amplitude, meter, VU
 **Cue**:
 A short sound played when a Dictation starts, when it stops, and when it is Cancelled. The Cancel Cue is distinct from the stop Cue, which says the words are on their way. Cues can be turned off, for dictating in a room with other people in it, and off is silent rather than quieter; the Pill cannot be turned off (ADR-0007).
 _Avoid_: beep, chime, sound effect
+
+**Notice**:
+What the Pill says in words when a Dictation ends in a Clipboard Fallback: that the words are on the clipboard. The only thing the Pill ever writes rather than draws, and the only one it stays up for after a Dictation is over — long enough to be read, and then gone. It says where the words are and never why they are there: what the user does next is paste, whichever way the Insertion failed.
+_Avoid_: toast, alert, banner, message
 
 **History**:
 The list of recent Final Texts kept on the machine so a Dictation is never lost. Written before Insertion is attempted, so a Dictation whose Insertion failed is in it too. Holds Final Text and a timestamp only — never audio, never the Raw Transcript, and never which app the words went into — keeps the hundred most recent and drops the rest, and is emptied in one action (ADR-0009).

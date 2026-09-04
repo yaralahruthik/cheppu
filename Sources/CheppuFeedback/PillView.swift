@@ -3,7 +3,7 @@ import CheppuCore
 
 /// What the Pill looks like.
 ///
-/// Two states, drawn so that they cannot be confused at a glance from the far
+/// Three states, drawn so that they cannot be confused at a glance from the far
 /// side of a screen (`docs/product-experience.md` §3).
 ///
 /// Listening is a row of bars that move with the voice. The question the user
@@ -18,6 +18,11 @@ import CheppuCore
 /// a voice, against one lying flat that travels on its own, is a difference the
 /// eye reads without being looked at. That it moves at all is the other half:
 /// what this state exists to prevent is a pause being read as a hang.
+///
+/// The Clipboard Fallback is the one state that is written rather than drawn,
+/// and the one that stands still. The other two are answers to "is it working?",
+/// which a shape answers faster than a word; this one asks the user to do
+/// something, and there is no shape that says "your words are on the clipboard".
 ///
 /// It is drawn by hand for the same reason the menu bar icon is: the bundle is
 /// assembled by `Scripts/make-app.sh` and has nowhere to keep an asset.
@@ -36,6 +41,20 @@ final class PillView: NSView {
     private static let barWidth: CGFloat = 4
     private static let barGap: CGFloat = 5
     private static let shortestBar: CGFloat = 5
+
+    /// The notice, and the size it is set in.
+    ///
+    /// Where the words are, in the words the rest of Cheppu uses for it. It
+    /// says nothing about why they are there: the user is reading this because
+    /// what they said did not appear, and "focus moved" or "Accessibility was
+    /// taken away" is an explanation they cannot do anything with. Where the
+    /// words are is the one thing they can.
+    ///
+    /// It fits the Pill at this size, which is what keeps the Pill the size it
+    /// is in every other state — one that grew for a message would be a shape
+    /// that moved while being read.
+    private static let notice = "On the clipboard"
+    private static let noticeSize: CGFloat = 13
 
     /// The mark that sweeps while the Engine works, and the track it runs in.
     private static let sweepLength: CGFloat = 38
@@ -71,7 +90,7 @@ final class PillView: NSView {
         self.state = state
 
         switch state {
-        case .listening:
+        case .listening, .onTheClipboard:
             stopTravelling()
         case .transcribing where travelling == nil:
             startTravelling()
@@ -128,7 +147,27 @@ final class PillView: NSView {
         switch state {
         case .listening(let level): drawTheLevel(level)
         case .transcribing: drawTheSweep()
+        case .onTheClipboard: drawTheNotice()
         }
+    }
+
+    /// The Clipboard Fallback, in words.
+    ///
+    /// Centred on both axes, in the same white the bars and the sweep are drawn
+    /// in, so that the Pill reads as the same object saying something rather
+    /// than as a different thing that has appeared.
+    private func drawTheNotice() {
+        let notice = NSAttributedString(
+            string: Self.notice,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: Self.noticeSize, weight: .medium),
+                .foregroundColor: Self.ink,
+            ]
+        )
+
+        let size = notice.size()
+        notice.draw(
+            at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2))
     }
 
     /// The voice, as five bars rising from the height they rest at.

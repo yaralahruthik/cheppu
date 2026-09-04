@@ -375,6 +375,21 @@ struct DictationMachineTests {
         #expect(machine.receive(.hotkeyPressed) == openingADictation)
     }
 
+    @Test("A Dictation that fails once it has finished deciding still takes the Pill down")
+    func aDictationThatFailsOnceItHasFinishedDecidingStillTakesThePillDown() {
+        var machine = DictationMachine()
+
+        // The machine returns to Idle before the last of a Dictation's effects
+        // are carried out — closing the microphone on a Cancel, taking the Pill
+        // down — so a failure among them arrives here rather than in one of the
+        // three running states. The Pill is taken down again: it costs nothing
+        // where it is already down, and where it is not it is the difference
+        // between a Dictation the user watched fail and a Pill left on their
+        // screen with nothing running to take it away.
+        #expect(machine.receive(.dictationFailed) == [.hidePill])
+        #expect(tap(&machine) == openingADictation)
+    }
+
     @Test("A press of the Hotkey while a Dictation is running stops it on the way down")
     func aPressWhileADictationIsRunningStopsItOnTheWayDown() {
         var machine = DictationMachine()
@@ -481,22 +496,25 @@ struct DictationMachineTests {
             ])
     }
 
-    @Test("A Dictation with no app to insert into keeps the words and ends")
-    func aDictationWithNoAppToInsertIntoKeepsTheWordsAndEnds() {
+    @Test("A Dictation with no app to insert into keeps the words and leaves them on the clipboard")
+    func aDictationWithNoAppToInsertIntoLeavesTheWordsOnTheClipboard() {
         var machine = DictationMachine()
         hold(&machine)
         _ = machine.receive(.targetAppNoted(nil))
         _ = machine.receive(.audioCaptured(spokenAudio))
 
         // Nothing had focus, so there is nowhere for the words to be typed.
-        // They are still the user's: History is written all the same, and the
-        // Dictation ends rather than waiting for an Insertion that cannot come.
-        // Telling the user, and leaving the text on the clipboard, is #14's.
+        // They are still the user's: History is written all the same, and they
+        // are left where the user can paste them themselves, with the Pill
+        // saying so rather than coming down on a Dictation that went nowhere.
         #expect(
             machine.receive(.rawTranscriptReceived(heardWords)) == [
                 .recordInHistory(FinalText("Hello there.")),
-                .hidePill,
+                .leaveOnTheClipboard(FinalText("Hello there.")),
+                .showPill(.onTheClipboard),
+                .leaveTheNoticeUp,
             ])
+        #expect(machine.receive(.noticeRead) == [.hidePill])
         #expect(tap(&machine) == openingADictation)
     }
 
@@ -758,5 +776,108 @@ struct DictationMachineTests {
         _ = machine.receive(.insertionSucceeded)
 
         #expect(tap(&machine) == openingADictation)
+    }
+
+    // MARK: - Clipboard Fallback
+
+    /// A Dictation carried to the moment the Final Text is handed to the
+    /// Insertion, so that a test can say what happened to it next.
+    private func aDictationReadyToInsert(
+        _ machine: inout DictationMachine,
+        into app: TargetApp,
+        hearing transcript: RawTranscript
+    ) -> [DictationEffect] {
+        tap(&machine)
+        tap(&machine)
+        _ = machine.receive(.targetAppNoted(app))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+        return machine.receive(.rawTranscriptReceived(transcript))
+    }
+
+    @Test("An Insertion that did not land leaves the words on the clipboard and says so")
+    func anInsertionThatDidNotLandLeavesTheWordsOnTheClipboard() {
+        var machine = DictationMachine()
+        _ = aDictationReadyToInsert(&machine, into: mail, hearing: heardWords)
+
+        // Never silent, and never lost: the words go where the user can paste
+        // them, and the Pill says where that is. The clipboard is written
+        // before the notice, so that a user who reads it and pastes at once
+        // finds the words already there.
+        #expect(
+            machine.receive(.insertionFailed) == [
+                .leaveOnTheClipboard(FinalText("Hello there.")),
+                .showPill(.onTheClipboard),
+                .leaveTheNoticeUp,
+            ])
+    }
+
+    @Test("The words left on the clipboard are the words the Insertion was handed")
+    func theWordsLeftOnTheClipboardAreTheWordsTheInsertionWasHanded() {
+        var machine = DictationMachine()
+        let effects = aDictationReadyToInsert(
+            &machine, into: ATargetApp.terminal, hearing: ARawTranscript.saidWithAPause)
+
+        // What could not be typed is what is left to paste. The user's next
+        // keystroke is the one that pastes it, and it is going into the same
+        // Terminal the Insertion was for, so the Paragraph Break stays
+        // flattened — a newline there is Return either way (#12). History keeps
+        // what was said, as it always does.
+        #expect(
+            effects == [
+                .recordInHistory(FinalText("That is one thought.\nThe next one")),
+                .insert(
+                    FinalText("That is one thought. The next one"), into: ATargetApp.terminal),
+            ])
+        #expect(
+            machine.receive(.insertionFailed) == [
+                .leaveOnTheClipboard(FinalText("That is one thought. The next one")),
+                .showPill(.onTheClipboard),
+                .leaveTheNoticeUp,
+            ])
+    }
+
+    @Test("The notice comes down once it has been read, and not before")
+    func theNoticeComesDownOnceItHasBeenRead() {
+        var machine = DictationMachine()
+        _ = aDictationReadyToInsert(&machine, into: mail, hearing: heardWords)
+
+        // The Pill is the whole of what tells the user their words are on the
+        // clipboard, so it cannot come down in the same breath as it goes up.
+        #expect(!machine.receive(.insertionFailed).contains(.hidePill))
+        #expect(machine.receive(.noticeRead) == [.hidePill])
+    }
+
+    @Test("A Dictation that fell back to the clipboard leaves Cheppu ready for the next one")
+    func aDictationThatFellBackToTheClipboardLeavesCheppuReadyForTheNextOne() {
+        var machine = DictationMachine()
+        _ = aDictationReadyToInsert(&machine, into: mail, hearing: heardWords)
+        _ = machine.receive(.insertionFailed)
+
+        // The next press starts a Dictation rather than trying to stop one that
+        // never finished, and it does so while the notice is still up: the
+        // Pill it shows is this Dictation's.
+        #expect(tap(&machine) == openingADictation)
+    }
+
+    @Test("An Insertion reported failed out of turn changes nothing")
+    func anInsertionReportedFailedOutOfTurnChangesNothing() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.insertionFailed).isEmpty)
+
+        tap(&machine)
+        #expect(machine.receive(.insertionFailed).isEmpty)
+        #expect(machine.receive(.noticeRead).isEmpty)
+    }
+
+    @Test("A notice read while the next Dictation is running does not take its Pill down")
+    func aNoticeReadWhileTheNextDictationIsRunningDoesNotTakeItsPillDown() {
+        var machine = DictationMachine()
+        _ = aDictationReadyToInsert(&machine, into: mail, hearing: heardWords)
+        _ = machine.receive(.insertionFailed)
+        tap(&machine)
+
+        // The Pill on screen belongs to the Dictation that is listening now.
+        #expect(machine.receive(.noticeRead).isEmpty)
     }
 }

@@ -19,6 +19,7 @@ actor PortJournal {
         case transcribed(CapturedAudio)
         case appendedToHistory(HistoryEntry)
         case inserted(FinalText, into: TargetApp)
+        case leftOnTheClipboard(FinalText)
     }
 
     private(set) var calls: [Call] = []

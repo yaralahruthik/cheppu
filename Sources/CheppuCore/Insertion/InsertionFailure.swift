@@ -6,8 +6,10 @@
 /// the Insertion could describe would arrive as an opaque `Error` — which is
 /// the same as not being told.
 ///
-/// Every one of these ends with the Final Text in History and nothing typed
-/// anywhere. Leaving it on the clipboard and saying so out loud is #14's.
+/// Every one of these ends the same way, and so does an error the core has no
+/// name for: the Final Text in History, nothing typed anywhere, and the words
+/// left on the clipboard with the Pill saying so. Which of them happened is
+/// not something the user is told, because what they do about it is the same.
 public enum InsertionFailure: Error, Equatable {
     /// The Target App is not the app a keystroke would reach any more: focus
     /// moved to another app between the Dictation stopping and the Final Text

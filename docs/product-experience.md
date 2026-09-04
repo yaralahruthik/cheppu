@@ -37,7 +37,7 @@ A crash, a permission problem, or a focus change must degrade to "the text is in
 
 The text should land exactly where the cursor was, in the app that had focus when dictation started, with no side effects. That means:
 
-- The clipboard is restored to what it held before.
+- The clipboard is restored to what it held before. The one exception is the clipboard fallback of §4: where insertion was not possible there is nothing to restore it for, and the text stays there to be pasted.
 - Focus does not move.
 - No trailing or leading whitespace surprises. If the cursor was mid-sentence, the text joins sensibly.
 - It works in native apps, Electron apps, browsers, and terminals alike.
