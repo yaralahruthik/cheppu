@@ -147,4 +147,33 @@ struct HotkeyGestureTests {
 
         #expect(Self.reported(from: strokes) == [.pressed, .pressSpoiled, .pressed, .released])
     }
+
+    // MARK: - Escape
+
+    @Test("Escape is reported wherever it is pressed")
+    func escapeIsReportedWhereverItIsPressed() {
+        // Whether it means anything is not the keyboard's to decide: Escape is
+        // Cancel while a Dictation is Listening and the user's own business at
+        // every other moment, and only the machine knows which of those this
+        // is.
+        #expect(Self.reported(from: [.escapePressed]) == [.escapePressed])
+    }
+
+    @Test("Escape during a Hold Cancels the Dictation rather than spoiling the press")
+    func escapeDuringAHoldCancelsTheDictationRatherThanSpoilingThePress() {
+        let strokes: [KeyStroke] = [Self.hotkeyDown, .escapePressed, Self.everythingUp]
+
+        // Someone holding the Hotkey and reaching for Escape is throwing the
+        // Dictation away, not typing. Reported as a spoiled press it would be a
+        // key brushed during a Hold, and what they said would be transcribed
+        // and inserted — the one thing they asked for it not to be.
+        #expect(Self.reported(from: strokes) == [.pressed, .escapePressed, .released])
+    }
+
+    @Test("Escape is still Escape when it is pressed with something held")
+    func escapeIsStillEscapeWhenItIsPressedWithSomethingHeld() {
+        let strokes: [KeyStroke] = [.modifiersHeld([.leftShift]), .escapePressed]
+
+        #expect(Self.reported(from: strokes) == [.escapePressed])
+    }
 }

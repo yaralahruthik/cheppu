@@ -31,12 +31,20 @@ enum KeyStroke: Equatable, Sendable {
     /// A modifier key went down or came up, leaving these held.
     case modifiersHeld(ModifierKeys)
 
-    /// A key that is not a modifier went down.
+    /// A key that is not a modifier, and not Escape, went down.
     ///
     /// Which key it was is deliberately not carried. All the Hotkey has to know
     /// is that the user was typing, and what they typed is none of Cheppu's
     /// business — the words it keeps are the ones it was asked to hear.
     case keyPressed
+
+    /// Escape went down.
+    ///
+    /// The one key Cheppu tells apart from the rest, because it is the one key
+    /// that means something to a Dictation that is running. It is told apart
+    /// and then let go of: the key code is read to answer "was that Escape?"
+    /// and is never carried any further.
+    case escapePressed
 }
 
 /// The keyboard itself.
@@ -89,6 +97,10 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
     /// and the only thing another key has to tell Cheppu is that it was pressed.
     private static let interesting: CGEventMask =
         (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
+
+    /// Escape. Virtual key codes are positions on the keyboard rather than
+    /// letters, and this is the position macOS calls `kVK_Escape`.
+    private static let escape: Int64 = 53
 
     func watch(_ struck: @escaping @Sendable (KeyStroke) -> Void) throws {
         // Nothing asks for this, but a tap left behind would be a second
@@ -172,7 +184,11 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
             report(.modifiersHeld(ModifierKeys(event.flags)))
 
         case .keyDown:
-            report(.keyPressed)
+            // The only question asked of a key Cheppu was not sent: was that
+            // Escape? The answer decides whether a Dictation is Cancelled, and
+            // the key code goes no further than this line.
+            let isEscape = event.getIntegerValueField(.keyboardEventKeycode) == Self.escape
+            report(isEscape ? .escapePressed : .keyPressed)
 
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // macOS switches a tap off if it ever takes too long, and leaves it

@@ -5,6 +5,9 @@ import CheppuCore
 /// The only part of watching the keyboard that decides anything, and so the part
 /// with tests. Everything it decides is one of two claims about the user: they
 /// meant to dictate, or they were typing and Cheppu should keep out of it.
+/// Escape is the one key it passes on without making either claim, because what
+/// Escape means depends on whether a Dictation is Listening, which only the
+/// machine knows.
 ///
 /// The press is reported on the way down rather than on the way back up, because
 /// a Dictation has to be running before the 250 ms that tell a tap from a Hold
@@ -40,6 +43,16 @@ struct HotkeyGesture {
             // The Hotkey held while a key is struck is the user typing with a
             // modifier, not reaching for Cheppu.
             return spoilThePress()
+
+        case .escapePressed:
+            // Reported wherever it was pressed, and never as a key struck: a
+            // Hotkey held while Escape goes down is someone throwing the
+            // Dictation away, and taken as typing it would be a key brushed
+            // during a Hold — which transcribes and inserts what they said,
+            // the one thing they asked for it not to do. What Escape means at
+            // this moment, and whether it means anything at all, is the
+            // machine's.
+            return .escapePressed
 
         case .modifiersHeld(let held):
             guard held.contains(Self.hotkey) else {

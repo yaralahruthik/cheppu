@@ -20,7 +20,9 @@ Everything runs on-device. There is no server, no telemetry, and no network acce
 3. Tap again, or release the key. Cheppu transcribes the audio on-device.
 4. The text is inserted at your cursor in the app you were using. Your clipboard is left as you had it.
 
-If Cheppu cannot insert into the focused app, the text is placed on your clipboard and the pill tells you so. Every dictation is also kept in History, so nothing you said is lost. Press Escape while listening to cancel.
+If Cheppu cannot insert into the focused app, the text is placed on your clipboard and the pill tells you so. Every dictation is also kept in History, so nothing you said is lost. A dictation with no speech in it disappears silently, and one left running stops itself after five minutes.
+
+Press Escape while listening to cancel: the audio is thrown away and nothing is inserted or kept. Cheppu never takes the key from the app you are in — it can read your keystrokes and cannot swallow them, by construction ([ADR-0006](./docs/adr/0006-escape-cancels-a-dictation-without-taking-the-key.md)) — so Escape also does whatever it would have done where you are typing, and a sound of its own tells you the dictation is gone.
 
 ## What ships in the MVP
 
@@ -76,6 +78,7 @@ swift test                      # run the suite
 ./Scripts/check-no-audio-reaches-the-disk.sh
 ./Scripts/check-the-hotkey-never-swallows-a-keystroke.sh
 ./Scripts/check-cheppu-types-one-keystroke.sh
+./Scripts/check-cheppu-tells-one-key-apart.sh
 ```
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.

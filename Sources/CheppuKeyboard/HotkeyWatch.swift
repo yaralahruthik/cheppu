@@ -5,9 +5,10 @@ import Foundation
 ///
 /// It watches the whole session's keyboard, so that the Hotkey works while any
 /// other app has focus and the user never has to click on Cheppu first, and it
-/// reports the one thing it is looking for: the Hotkey going down on its own,
-/// and what became of that press. Everything else passes it by untouched and
-/// unrecorded.
+/// reports the two things it is looking for: the Hotkey going down on its own
+/// and what became of that press, and Escape. Everything else passes it by
+/// untouched and unrecorded — and so, in fact, do those two: the tap can read a
+/// key and cannot take one (ADR-0006).
 public actor HotkeyWatch: HotkeyPort {
     private let accessibility: any AccessibilityAccess
     private let keyboard: any Keyboard

@@ -134,4 +134,14 @@ public enum PillState: Equatable, Sendable {
 public enum Cue: Equatable, Sendable {
     case dictationStarted
     case dictationStopped
+
+    /// The Dictation was thrown away, because the user said so.
+    ///
+    /// A sound of its own rather than the stop Cue, because the two say
+    /// opposite things about what happens next: one means the words are on
+    /// their way, and this one means there are none. It is also the only way a
+    /// user with their eyes on their work can tell that Escape reached Cheppu
+    /// at all — the key is never taken from the app they are in, so nothing
+    /// else about the moment is different.
+    case dictationCancelled
 }

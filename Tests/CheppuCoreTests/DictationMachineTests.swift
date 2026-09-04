@@ -50,12 +50,14 @@ struct DictationMachineTests {
 
     /// What starting a Dictation always decides, whichever Activation started it.
     private let openingADictation: [DictationEffect] = [
-        .startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent)),
+        .startCapturing, .startTheCap, .playCue(.dictationStarted),
+        .showPill(.listening(.silent)),
     ]
 
     /// What stopping a Dictation always decides, whichever Activation stopped it.
     private let closingADictation: [DictationEffect] = [
-        .noteTargetApp, .stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing),
+        .noteTargetApp, .stopCapturing, .stopTheCap, .playCue(.dictationStopped),
+        .showPill(.transcribing),
     ]
 
     /// Everything a Toggle Activation decides, from the first tap to the words
@@ -205,7 +207,7 @@ struct DictationMachineTests {
         // and nothing is transcribed, inserted or kept: the user was typing.
         #expect(
             machine.receive(.hotkeyPressSpoiled(heldFor: .milliseconds(40)))
-                == [.stopCapturing, .hidePill])
+                == [.stopCapturing, .stopTheCap, .hidePill])
 
         // Nothing is left running, so the next tap starts a Dictation rather
         // than stopping one.
@@ -272,10 +274,12 @@ struct DictationMachineTests {
         #expect(
             aWholeDictation(&machine) == [
                 .startCapturing,
+                .startTheCap,
                 .playCue(.dictationStarted),
                 .showPill(.listening(.silent)),
                 .noteTargetApp,
                 .stopCapturing,
+                .stopTheCap,
                 .playCue(.dictationStopped),
                 .showPill(.transcribing),
                 .transcribe(spokenAudio),
@@ -525,5 +529,198 @@ struct DictationMachineTests {
 
         _ = machine.receive(.hotkeyPressed)
         #expect(machine.receive(.targetAppNoted(mail)).isEmpty)
+    }
+
+    // MARK: - Cancel
+
+    @Test("Escape while Listening throws the whole Dictation away")
+    func escapeWhileListeningThrowsTheWholeDictationAway() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+
+        // The user misspoke. The microphone closes, the Cap is called off, and
+        // the Dictation is over: nothing goes to the Engine, nothing is
+        // inserted, and nothing is kept.
+        #expect(
+            machine.receive(.escapePressed) == [
+                .stopCapturing, .stopTheCap, .playCue(.dictationCancelled), .hidePill,
+            ])
+    }
+
+    @Test("A Cancelled Dictation never reaches the Engine, whatever the microphone heard")
+    func aCancelledDictationNeverReachesTheEngine() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+        _ = machine.receive(.escapePressed)
+
+        // The audio the microphone had already heard arrives after the
+        // Dictation was thrown away. It is dropped where it lands.
+        #expect(machine.receive(.audioCaptured(spokenAudio)).isEmpty)
+    }
+
+    @Test("Cancel answers the user, where Discard says nothing at all")
+    func cancelAnswersTheUserWhereDiscardSaysNothing() {
+        var cancelled = DictationMachine()
+        _ = cancelled.receive(.hotkeyPressed)
+
+        // Cancel is something the user did on purpose, and their eyes are on
+        // their work, so it is answered out loud — and with a Cue of its own
+        // rather than the stop Cue, which would say their words were on the
+        // way. Discard is something Cheppu did on their behalf, and it is
+        // silent.
+        #expect(cancelled.receive(.escapePressed).contains(.playCue(.dictationCancelled)))
+
+        var discarded = DictationMachine()
+        hold(&discarded)
+        _ = discarded.receive(.targetAppNoted(mail))
+        _ = discarded.receive(.audioCaptured(spokenAudio))
+        #expect(
+            discarded.receive(.rawTranscriptReceived(RawTranscript(text: "", words: [])))
+                == [.hidePill])
+    }
+
+    @Test("A Cancelled Dictation leaves Cheppu ready for the next one")
+    func aCancelledDictationLeavesCheppuReadyForTheNextOne() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+        _ = machine.receive(.escapePressed)
+
+        // The key may well still be down — Escape cancels a Hold as readily as
+        // a Toggle — so letting go of it must not be read as the end of a
+        // Dictation that is already over.
+        #expect(machine.receive(.hotkeyReleased(heldFor: .seconds(3))).isEmpty)
+        #expect(tap(&machine) == openingADictation)
+    }
+
+    @Test("Escape changes nothing whenever a Dictation is not Listening")
+    func escapeChangesNothingWheneverADictationIsNotListening() {
+        var machine = DictationMachine()
+
+        // Nothing running: Escape is the user closing a dialog in the app they
+        // are working in, and it is none of Cheppu's business.
+        #expect(machine.receive(.escapePressed).isEmpty)
+
+        // With the Engine: what was said is already captured, and Escape is too
+        // late to throw it away rather than a second, quieter way to lose work.
+        hold(&machine)
+        #expect(machine.receive(.escapePressed).isEmpty)
+
+        // And on the way into the Target App.
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+        _ = machine.receive(.rawTranscriptReceived(heardWords))
+        #expect(machine.receive(.escapePressed).isEmpty)
+        #expect(machine.receive(.insertionSucceeded) == [.hidePill])
+    }
+
+    // MARK: - Discard
+
+    @Test("A Dictation the Engine heard no words in ends silently")
+    func aDictationTheEngineHeardNoWordsInEndsSilently() {
+        var machine = DictationMachine()
+        hold(&machine)
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        // A Hotkey tapped by accident. There is nothing to insert, so nothing
+        // is inserted; and nothing worth keeping, so History is left alone. A
+        // stray tap must litter neither the user's document nor their History.
+        #expect(
+            machine.receive(.rawTranscriptReceived(RawTranscript(text: "", words: [])))
+                == [.hidePill])
+    }
+
+    @Test("A Dictation whose text is only whitespace is Discarded too")
+    func aDictationWhoseTextIsOnlyWhitespaceIsDiscardedToo() {
+        var machine = DictationMachine()
+        hold(&machine)
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+
+        // What the Engine hands back for a Dictation with no speech in it is a
+        // space and a newline as often as it is nothing at all, and a Dictation
+        // that inserted those would be a stray tap that moved the user's cursor.
+        #expect(
+            machine.receive(.rawTranscriptReceived(RawTranscript(text: " \n", words: [])))
+                == [.hidePill])
+    }
+
+    @Test("A Discarded Dictation leaves Cheppu ready for the next one")
+    func aDiscardedDictationLeavesCheppuReadyForTheNextOne() {
+        var machine = DictationMachine()
+        hold(&machine)
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+        _ = machine.receive(.rawTranscriptReceived(RawTranscript(text: "", words: [])))
+
+        #expect(tap(&machine) == openingADictation)
+    }
+
+    // MARK: - The Cap
+
+    @Test("The Cap is five minutes, and a Dictation still running at it is transcribed as any other")
+    func aDictationStillRunningAtTheCapStopsAndIsTranscribed() {
+        #expect(DictationMachine.cap == .seconds(5 * 60))
+
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+
+        // The user walked away with a Toggle running. What they did say is
+        // theirs — the Dictation ends exactly as if they had ended it
+        // themselves.
+        #expect(machine.receive(.capReached) == closingADictation)
+    }
+
+    @Test("The Cap starts with the Dictation and is called off when it ends")
+    func theCapStartsWithTheDictationAndIsCalledOffWhenItEnds() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.hotkeyPressed).contains(.startTheCap))
+        // Every way out of Listening calls it off, so the five minutes of one
+        // Dictation can never end over the top of the next one.
+        #expect(machine.receive(.hotkeyReleased(heldFor: .seconds(2))).contains(.stopTheCap))
+
+        var cancelled = DictationMachine()
+        _ = cancelled.receive(.hotkeyPressed)
+        #expect(cancelled.receive(.escapePressed).contains(.stopTheCap))
+
+        var spoiled = DictationMachine()
+        _ = spoiled.receive(.hotkeyPressed)
+        #expect(
+            spoiled.receive(.hotkeyPressSpoiled(heldFor: .milliseconds(40))).contains(.stopTheCap))
+
+        var failed = DictationMachine()
+        _ = failed.receive(.hotkeyPressed)
+        #expect(failed.receive(.dictationFailed) == [.stopTheCap, .hidePill])
+    }
+
+    @Test("The Cap reached out of turn changes nothing")
+    func theCapReachedOutOfTurnChangesNothing() {
+        var machine = DictationMachine()
+
+        #expect(machine.receive(.capReached).isEmpty)
+
+        // And a Cap that ends while the Engine is working on the Dictation it
+        // was counting for cannot stop it a second time.
+        hold(&machine)
+        #expect(machine.receive(.capReached).isEmpty)
+    }
+
+    @Test("A Dictation stopped by the Cap leaves Cheppu ready for the next one")
+    func aDictationStoppedByTheCapLeavesCheppuReadyForTheNextOne() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+        _ = machine.receive(.capReached)
+
+        // Five minutes of a Hold is a key that is still down. Letting go of it
+        // belongs to a Dictation that is over.
+        #expect(machine.receive(.hotkeyReleased(heldFor: .seconds(5 * 60))).isEmpty)
+
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+        _ = machine.receive(.rawTranscriptReceived(heardWords))
+        _ = machine.receive(.insertionSucceeded)
+
+        #expect(tap(&machine) == openingADictation)
     }
 }

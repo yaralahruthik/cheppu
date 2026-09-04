@@ -36,6 +36,9 @@ jobs:
       - name: Cheppu types one keystroke
         run: ./Scripts/check-cheppu-types-one-keystroke.sh
 
+      - name: Cheppu tells one key apart
+        run: ./Scripts/check-cheppu-tells-one-key-apart.sh
+
       # No Engine downloaded, no model, no microphone and nothing granted on
       # this runner: the suite has to be green all the same, which is the whole
       # point of the ports.
