@@ -1,0 +1,47 @@
+Tests/CheppuKeyboardTests/HotkeyGestureTests.swift
+  s_b5037fd00acf9b::t_720be997cd3e9b 6-8,14-15,27-32,35-39,42-46,53,59-60,68,71-72,75,83,95-99,102-103,105-106,109-122,125-126,135,138-139,148
+Sources/CheppuKeyboard/HotkeyWatch.swift
+  s_b5037fd00acf9b::t_d7a98ff9a69683 8-10,65-66
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_b5037fd00acf9b::t_7dfe9f1827ed0c 1-2
+  s_b5037fd00acf9b::t_bfeb3ef41ed90a 30-36,57-58,69-74,78,83-94,98-107,113-114
+CONTEXT.md
+  s_b5037fd00acf9b::t_ae20375ff976af 25-28
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_b5037fd00acf9b::t_688cbfe3bfd591 7,11-14,28,30-44,47
+Sources/CheppuCore/Ports/Ports.swift
+  s_b5037fd00acf9b::t_20d71c068903eb 13-19,21-29,31-34,39-40,160-162
+Sources/CheppuKeyboard/HotkeyGesture.swift
+  s_b5037fd00acf9b::t_643d60742e0e76 3,9-13,15-20,36,42,46,49,52,54-57,59,61-65,68-77
+  s_b5037fd00acf9b::t_ac0fd07cd9d2f0 78
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_b5037fd00acf9b::t_1d3bbbff475506 280-282
+  s_b5037fd00acf9b::t_8775b8953f8eeb 25-44,46-47,49-54,99-135,138-139,153-154,157,159,168-210,258-260,267-279,283
+Tests/CheppuKeyboardTests/Fakes/FakeKeyboard.swift
+  s_b5037fd00acf9b::t_a76c7da856f47e 75-77,79-80,84-85,89,93,95-98,100
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_b5037fd00acf9b::t_b6697f65be750b 34-60,64-65,72-251,273-289,294,302,304,312,314-316,324,341,352,355,358-359,361,363-364,373,388,394,406,424,429,435,449-450,464,477,483,507
+Tests/CheppuKeyboardTests/HotkeyWatchTests.swift
+  s_b5037fd00acf9b::t_a76c7da856f47e 53,84,101,124-125,134,142
+  s_b5037fd00acf9b::t_d7a98ff9a69683 65-66,80-81,89-94,115-117,131-133,138-139,152-156
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_b5037fd00acf9b::t_1d3bbbff475506 294
+  s_b5037fd00acf9b::t_d93ca9bc362f67 86-105,277
+  s_b5037fd00acf9b::t_df80b9f05abc78 18-20,106-112,115-134,141-142,198-276,278-293,295-352,446,470-471,474,496,500,540
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "8f990e74a62e7a5a513b9ab2f9cddf2d170e3490",
+  "prompts": {},
+  "sessions": {
+    "s_b5037fd00acf9b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b618abd0-f1e6-49bd-aa50-f699c126335c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
