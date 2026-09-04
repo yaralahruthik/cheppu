@@ -98,6 +98,30 @@ enum ATargetApp {
     static let browser = TargetApp(bundleIdentifier: "com.apple.Safari", processIdentifier: 502)
 }
 
+/// Raw Transcripts to put in the Engine's mouth.
+enum ARawTranscript {
+    /// One Dictation with all three Cleanup rules' worth of work in it: a
+    /// Filler Word, two sentences that do not start with a capital, and a
+    /// two-second pause between them.
+    ///
+    /// Shared by the three suites that ask what Cleanup did with it — the rules
+    /// themselves, the machine that applies them, and the core the app builds —
+    /// so that all three are talking about the same Dictation.
+    static let saidWithAPause = RawTranscript(
+        text: "um, that is one thought. the next one",
+        words: [
+            WordTiming(word: "um,", start: .zero, end: .milliseconds(200)),
+            WordTiming(word: "that", start: .milliseconds(300), end: .milliseconds(500)),
+            WordTiming(word: "is", start: .milliseconds(600), end: .milliseconds(800)),
+            WordTiming(word: "one", start: .milliseconds(900), end: .milliseconds(1_100)),
+            WordTiming(word: "thought.", start: .milliseconds(1_200), end: .milliseconds(1_700)),
+            WordTiming(word: "the", start: .milliseconds(3_700), end: .milliseconds(3_900)),
+            WordTiming(word: "next", start: .milliseconds(4_000), end: .milliseconds(4_200)),
+            WordTiming(word: "one", start: .milliseconds(4_300), end: .milliseconds(4_500)),
+        ]
+    )
+}
+
 /// Where the keyboard is pointing, as the test says it is.
 ///
 /// A real Insertion asks macOS which app is frontmost; this one is told, and

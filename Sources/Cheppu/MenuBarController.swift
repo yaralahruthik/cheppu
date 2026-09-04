@@ -62,6 +62,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let engine: any EnginePort = parakeet ?? EngineWithNowhereToLive()
 
         let dictations = DictationCore(
+            // Every Cleanup rule on, which is what a Dictation does until the
+            // Settings window (#15) gives the user the three switches.
+            cleaningWith: .all,
             hotkey: HotkeyWatch(),
             audio: MicrophoneCapture(),
             engine: engine,
