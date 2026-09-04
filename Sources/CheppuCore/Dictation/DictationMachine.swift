@@ -370,6 +370,19 @@ public struct DictationMachine: Sendable {
             thisPressOpenedTheDictation = false
             return [.hidePill]
 
+        case (.idle, .dictationFailed):
+            // A Dictation that had already finished deciding when one of the
+            // things it decided went wrong: the machine returns to Idle before
+            // the last effects of a Dictation are carried out — writing
+            // History, and taking the Pill down — so a failure among them
+            // arrives here rather than in one of the three states above.
+            //
+            // The Pill is taken down again. It costs nothing where it is
+            // already down, and where it is not it is the difference between a
+            // Dictation the user watched fail and a Pill left on their screen
+            // with nothing left running to take it away.
+            return [.hidePill]
+
         default:
             return []
         }

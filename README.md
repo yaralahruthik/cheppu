@@ -16,7 +16,7 @@ Everything runs on-device. There is no server, no telemetry, and no network acce
 ## How it works
 
 1. Tap the hotkey to start dictating, or hold it down to dictate only while held. The default hotkey is the right Option key on its own. Any bare modifier or key chord can be set instead.
-2. A small floating pill shows that Cheppu is listening, with a live input level. A short sound confirms start and stop.
+2. A small floating pill shows that Cheppu is listening, with a live input level that moves with your voice. It never takes the keyboard from the app you are typing in, and it steps out of the way of the field you are dictating into. A short sound confirms start and stop, and the sounds can be turned off for dictating in a meeting.
 3. Tap again, or release the key. Cheppu transcribes the audio on-device.
 4. The text is inserted at your cursor in the app you were using. Your clipboard is left as you had it.
 
@@ -31,7 +31,7 @@ Press Escape while listening to cancel: the audio is thrown away and nothing is 
 - Transcription after you stop speaking, not live partials. Final results only.
 - Deterministic cleanup: sentence capitalisation, filler-word removal, and paragraph breaks on long pauses, each switchable.
 - A five-minute cap per dictation, so a forgotten toggle cannot record forever.
-- A recording pill with input level, plus start and stop sounds.
+- A recording pill with input level, plus start and stop sounds that can be turned off from the menu bar ([ADR-0007](./docs/adr/0007-the-cues-can-be-silenced-and-the-pill-cannot.md)).
 - Text-only History of recent dictations. Audio is discarded after transcription.
 - A settings window that fits on one screen: hotkey, cleanup toggles, sounds, launch at login, permissions status, and History.
 - Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command.
@@ -67,10 +67,10 @@ Choosing the Fn/Globe key as your hotkey adds one more, Input Monitoring, and ne
 
 ## Building
 
-Cheppu is a Swift package of six targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `CheppuKeyboard` is the Hotkey: the one place Cheppu watches keys it was not sent and asks for Accessibility. `CheppuInsertion` is the pasteboard and the one keystroke Cheppu ever types. `Cheppu` is the menu bar app that performs what the core decides.
+Cheppu is a Swift package of seven targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `CheppuKeyboard` is the Hotkey: the one place Cheppu watches keys it was not sent and asks for Accessibility. `CheppuInsertion` is the pasteboard and the one keystroke Cheppu ever types. `CheppuFeedback` is the pill and the sounds: the one place Cheppu draws over another app's window or makes a noise. `Cheppu` is the menu bar app that performs what the core decides.
 
 ```sh
-swift build                     # build the core, the Engine, the microphone, the keyboard, the Insertion and the app
+swift build                     # build the core, the Engine, the microphone, the keyboard, the Insertion, the Pill and the app
 swift test                      # run the suite
 ./Scripts/make-app.sh           # assemble dist/Cheppu.app
 ./Scripts/check-core-is-headless.sh
@@ -79,11 +79,12 @@ swift test                      # run the suite
 ./Scripts/check-the-hotkey-never-swallows-a-keystroke.sh
 ./Scripts/check-cheppu-types-one-keystroke.sh
 ./Scripts/check-cheppu-tells-one-key-apart.sh
+./Scripts/check-the-pill-never-takes-focus.sh
 ```
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
 
-The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard or types a key, so running it never asks your terminal for Microphone or Accessibility access and never disturbs what you had copied. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
+The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard, types a key, puts a window on your screen or makes a sound, so running it never asks your terminal for Microphone or Accessibility access, never disturbs what you had copied, and is silent. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
 
 Transcribing for real needs the 480 MB Engine, so those tests are off by default and off in CI:
 

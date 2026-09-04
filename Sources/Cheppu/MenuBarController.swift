@@ -2,6 +2,7 @@ import AppKit
 import CheppuAudio
 import CheppuCore
 import CheppuEngine
+import CheppuFeedback
 import CheppuInsertion
 import CheppuKeyboard
 
@@ -25,6 +26,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Accessibility hangs off this.
     private var canSeeTheHotkey = false
 
+    /// The switch in front of the Cues, which the menu both shows and moves.
+    ///
+    /// Read from here rather than remembered, so that the menu cannot come to
+    /// disagree with what a Dictation actually does.
+    private let cues = SystemCueSwitch()
+
     /// How long to leave between asking macOS again whether Cheppu may watch
     /// the keyboard. Accessibility is granted by hand in System Settings and
     /// nothing tells an app when that happens, so the alternative to asking
@@ -44,7 +51,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     ///
     /// This is the whole of Cheppu in one place: the keyboard the Hotkey is
     /// watched on, the microphone it listens through, the Engine that hears it,
-    /// and the pasteboard the words are put where the cursor is with.
+    /// the pasteboard the words are put where the cursor is with, and the Pill
+    /// and Cues that say which of those is happening.
     private func runDictations() {
         let parakeet = try? ParakeetEngine()
         // A machine with nowhere to keep the Engine still gets a Hotkey, and
@@ -60,7 +68,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             insertion: PasteInsertion(),
             clipboard: SystemClipboard(),
             history: UnkeptHistory(),
-            feedback: SilentFeedback(),
+            feedback: PillAndCues(),
             clock: SystemClock()
         )
         self.dictations = dictations
@@ -115,7 +123,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func showMenu() {
-        statusItem?.menu = menu(for: MenuBarMenu(canSeeTheHotkey: canSeeTheHotkey))
+        statusItem?.menu = menu(
+            for: MenuBarMenu(canSeeTheHotkey: canSeeTheHotkey, areCuesOn: cues.areCuesOn())
+        )
     }
 
     private func menu(for menuBarMenu: MenuBarMenu) -> NSMenu {
@@ -128,6 +138,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             )
             menuItem.target = self
             menuItem.representedObject = item
+            menuItem.state = item.isTicked ? .on : .off
             menu.addItem(menuItem)
         }
         return menu
@@ -138,6 +149,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         switch item {
         case .allowAccessibility:
             AccessibilityRequest.ask()
+        case .cues(let areOn):
+            cues.turnCues(on: !areOn)
+            showMenu()
         case .quit:
             NSApp.terminate(nil)
         }

@@ -56,6 +56,7 @@ struct DictationCoreTests {
             now: Date = DictationCoreTests.aTuesdayAfternoon,
             typingIn app: TargetApp? = DictationCoreTests.mail,
             insertion: FakeInsertion.Outcome = .lands,
+            historyRefuses: Bool = false,
             isAccessibilityGranted: Bool = true
         ) {
             let journal = PortJournal()
@@ -72,7 +73,7 @@ struct DictationCoreTests {
                 engine: FakeEngine(journal: journal, transcript: hears),
                 insertion: FakeInsertion(journal: journal, focus: focus, outcome: insertion),
                 clipboard: FakeClipboard(),
-                history: FakeHistory(journal: journal),
+                history: FakeHistory(journal: journal, refuses: historyRefuses),
                 feedback: FakeFeedback(journal: journal),
                 clock: clock
             )
@@ -389,6 +390,23 @@ struct DictationCoreTests {
         #expect(await scenario.journal.calls.calls(.capturingStopped, before: .cuePlayed(.dictationStopped)))
     }
 
+    @Test("The Pill says it is transcribing before the Engine is asked, so a pause is never a hang")
+    func thePillSaysItIsTranscribingBeforeTheEngineIsAsked() async throws {
+        let scenario = Scenario()
+
+        try await scenario.toggleADictation()
+
+        // The Engine is the one part of a Dictation that takes long enough for
+        // the user to wonder (`docs/product-experience.md` §3), and they are
+        // told what is happening before it starts rather than after it ends.
+        #expect(
+            await scenario.journal.calls.calls(
+                .pillShown(.transcribing),
+                before: .transcribed(Self.spokenAudio)
+            )
+        )
+    }
+
     @Test("The audio the Dictation captured is the audio the Engine was given")
     func theAudioTheDictationCapturedIsTheAudioTheEngineWasGiven() async throws {
         let spoken = CapturedAudio(samples: [0.9, 0.8, 0.7, 0.6], sampleRate: 44_100)
@@ -443,6 +461,21 @@ struct DictationCoreTests {
         try await scenario.tapThroughTheCore()
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
+    }
+
+    @Test("A Dictation that fails on its last step still takes the Pill down")
+    func aDictationThatFailsOnItsLastStepStillTakesThePillDown() async throws {
+        // Nothing had focus, so this Dictation ends at History — and History
+        // will not take it. The machine has already returned to Idle by the
+        // time that happens, which is the one moment a failure could leave a
+        // Pill on screen with nothing left running to take it away.
+        let scenario = Scenario(typingIn: nil, historyRefuses: true)
+
+        await #expect(throws: FakeHistory.Refused.self) {
+            try await scenario.toggleADictation()
+        }
+
+        #expect(await scenario.journal.calls.last == .pillHidden)
     }
 
     @Test("What the microphone is hearing is what the Pill is told to show")

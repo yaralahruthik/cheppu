@@ -39,6 +39,9 @@ jobs:
       - name: Cheppu tells one key apart
         run: ./Scripts/check-cheppu-tells-one-key-apart.sh
 
+      - name: The Pill never takes focus
+        run: ./Scripts/check-the-pill-never-takes-focus.sh
+
       # No Engine downloaded, no model, no microphone and nothing granted on
       # this runner: the suite has to be green all the same, which is the whole
       # point of the ports.
