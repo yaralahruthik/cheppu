@@ -1,0 +1,67 @@
+Tests/CheppuHistoryTests/HistoryStoreTests.swift
+  s_2648551c8c4755::t_525e163d1820be 47,50-51,57-58,60-61,168-184,245-246,251
+  s_2648551c8c4755::t_38ed1bb05ee666 1-46,48-49,52-56,59,62-70,73-102,127-167,185-209,217-227,231,233-244,247-250,252-258
+  s_2648551c8c4755::t_20bef3d467ad22 228-230,232
+  s_2648551c8c4755::t_4d013503774614 210-216
+  s_2648551c8c4755::t_7bd6895edfc0d0 71-72,103-126
+.github/workflows/ci.yml
+  s_2648551c8c4755::t_48be51418c8c9b 48-50
+Tests/CheppuCoreTests/MenuBarMenuTests.swift
+  s_2648551c8c4755::t_448ff9a50b2138 15-16,18-19,23-32,58,69,77
+README.md
+  s_2648551c8c4755::t_48be51418c8c9b 70,73,84,89
+  s_2648551c8c4755::t_031c90f9bf0095 35
+Scripts/check-history-holds-text-only.sh
+  s_2648551c8c4755::t_70220c9cf23584 24-31,45-46,48-58,66-67,69-70,74-75,87-95
+  s_2648551c8c4755::t_cf40b46f9211ec 32-44,65
+  s_2648551c8c4755::t_b664a7dcc8af56 1-23,47,59-64,68,71-73,76-86,96-97
+Sources/CheppuCore/History/History.swift
+  s_2648551c8c4755::t_8b263973f33bc8 1-40
+docs/adr/0009-history-is-a-file-of-its-own-not-a-preference.md
+  s_2648551c8c4755::t_7c630c0af81796 28
+  s_2648551c8c4755::t_c8fa4a97d72547 13,19-20,26-27
+  s_2648551c8c4755::t_031c90f9bf0095 1-12,14-18,21-25,29
+Sources/CheppuHistory/HistoryStore.swift
+  s_2648551c8c4755::t_89892c6266c15c 35-36,107-108,132-141
+  s_2648551c8c4755::t_95b7805660318f 1-34,37-76,81-82,87-106,109-113,116-131,142-155
+  s_2648551c8c4755::t_7bd6895edfc0d0 77-80,83-86,114-115
+Package.swift
+  s_2648551c8c4755::t_3af2859c8838e5 61-72,89,118-121
+  s_2648551c8c4755::t_b8d285a5b1bad3 122
+Tests/CheppuCoreTests/HistoryTests.swift
+  s_2648551c8c4755::t_752fddc2c11676 1-29,32,37-42,45-59,61-69
+  s_2648551c8c4755::t_b8862479ef5afb 30-31,60
+  s_2648551c8c4755::t_525e163d1820be 33-36,43-44
+CONTEXT.md
+  s_2648551c8c4755::t_5a07517d1b1907 104
+Sources/CheppuHistory/HistoryFile.swift
+  s_2648551c8c4755::t_525e163d1820be 41-44
+  s_2648551c8c4755::t_89892c6266c15c 8-16,36-38
+  s_2648551c8c4755::t_95b7805660318f 1
+  s_2648551c8c4755::t_64fe950b5494d8 2-7,17-35,39-40,45-72
+Sources/CheppuCore/MenuBarMenu.swift
+  s_2648551c8c4755::t_a5370c48959049 11-19,35-37,50,61,68-70,83-84
+Sources/Cheppu/MenuBarController.swift
+  s_2648551c8c4755::t_321dd8643bf642 163
+  s_2648551c8c4755::t_b19f3857d0b207 6,26-32,81,164
+Sources/CheppuHistory/HistoryWindow.swift
+  s_2648551c8c4755::t_ffa78230410469 20,114,226
+  s_2648551c8c4755::t_525e163d1820be 126-127
+  s_2648551c8c4755::t_419f2f803ebaf2 1-19,21-113,115-125,128-225,227-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "5d7292080e4c62e708a2d14d7ce94e5fe4b35542",
+  "prompts": {},
+  "sessions": {
+    "s_2648551c8c4755": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0d7fe85d-a592-4fbb-92f3-f593ab82c471",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
