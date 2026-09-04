@@ -22,18 +22,50 @@ public enum DictationState: Equatable, Sendable {
 /// reporting back what it was asked to do. Cancel, Discard and the Cap arrive
 /// with their own tickets.
 public enum DictationEvent: Equatable, Sendable {
-    case activationStarted
-    case activationStopped
-
-    /// The Hotkey was tapped, which is a Toggle: it starts a Dictation when
-    /// none is running and stops the one that is.
+    /// The Hotkey went down on its own.
     ///
-    /// One event rather than two because only the machine knows which of the
-    /// two a tap means. A keyboard that decided for itself would have to keep a
-    /// copy of whether a Dictation is running, and every way a Dictation ends
-    /// without the Hotkey — the Cap, a Cancel, a failure — would leave that
-    /// copy wrong and the next tap doing the opposite of what the user meant.
-    case activationToggled
+    /// A Dictation starts here rather than on the way back up, so that the
+    /// quarter of a second spent deciding whether this is a Toggle or a Hold is
+    /// spent with the microphone already open. Someone who holds the key starts
+    /// speaking as they press it, and the threshold must not cost them the
+    /// first word of it.
+    ///
+    /// A Dictation already running stops here too, and for the opposite reason:
+    /// there is nothing left to find out. The user has finished speaking, so
+    /// waiting for the key to come up would be latency spent on a question
+    /// already answered.
+    case hotkeyPressed
+
+    /// The Hotkey came back up, having been held this long.
+    ///
+    /// How long is the whole of the difference between the two Activations, and
+    /// it is measured rather than chosen: let go inside `holdThreshold` and the
+    /// press was a tap, which leaves a Toggle Dictation running until the next
+    /// tap; held past it and letting go is the end of a Hold. So there is no
+    /// setting and no mode — the same key does the obvious thing both ways.
+    ///
+    /// The core reads the Clock at both ends and hands the span over, so that
+    /// nothing in here has to know what time it is.
+    case hotkeyReleased(heldFor: Duration)
+
+    /// The press turned out to be typing: a key was struck, or another modifier
+    /// joined it, while the Hotkey was down.
+    ///
+    /// The Hotkey is a bare modifier — right Option types an accented character
+    /// on several layouts — so a Dictation begun on the way down has to be
+    /// something Cheppu can hand back. Nothing the user typed is Cheppu's
+    /// business, and neither is what the microphone happened to hear while they
+    /// typed it.
+    ///
+    /// It carries how long the key had been down for the same reason a release
+    /// does, and it is the same measurement: a press spoiled inside
+    /// `holdThreshold` was someone typing an é, and one spoiled after it was
+    /// someone three seconds into a Hold who brushed a key. Only the first is
+    /// handed back.
+    ///
+    /// Nothing follows this. A spoiled press is never reported released, so a
+    /// Dictation left running here would be one nothing could end.
+    case hotkeyPressSpoiled(heldFor: Duration)
 
     /// Who had focus at the moment the Dictation stopped, which is who the
     /// Insertion is for. Nothing, where no app had focus at all.
@@ -78,7 +110,36 @@ public enum DictationEffect: Equatable, Sendable {
 /// no pasteboard. That is what makes every rule about how a Dictation behaves
 /// assertable as a list of effects, in order, with nothing granted or installed.
 public struct DictationMachine: Sendable {
+    /// How long the Hotkey has to be held for letting go of it to stop the
+    /// Dictation rather than leave it running.
+    ///
+    /// A fixed constant rather than a setting (#1). It is the only thing
+    /// telling Toggle and Hold apart, and a number the user could move would
+    /// turn one key doing the obvious thing into two gestures they have to keep
+    /// in mind.
+    ///
+    /// A quarter of a second is longer than anyone's tap and shorter than
+    /// anyone's press, so neither gesture has to be performed carefully to be
+    /// read correctly.
+    public static let holdThreshold: Duration = .milliseconds(250)
+
     private(set) var state: DictationState
+
+    /// Whether the press currently holding the Hotkey down is the one that
+    /// opened the Dictation that is running.
+    ///
+    /// The only thing letting go of the key needs to know, and the one thing
+    /// the keyboard cannot tell it: whether a Dictation was already running
+    /// when the key went down. A keyboard keeping its own copy of that would be
+    /// wrong the moment a Dictation ended without it — a failure today, the Cap
+    /// and a Cancel with #9 — and the user's next press would do the opposite
+    /// of what they meant.
+    ///
+    /// False for a press that came down on a Dictation already running, for one
+    /// that turned out to be typing, and for one that was already down when
+    /// Cheppu started watching. None of those has anything left to decide on
+    /// the way up.
+    private var thisPressOpenedTheDictation = false
 
     /// Who this Dictation is for, from the moment it stopped. Held here rather
     /// than looked up again when the words are ready, because by then the user
@@ -93,12 +154,13 @@ public struct DictationMachine: Sendable {
     /// should happen.
     ///
     /// An event the current state has no answer for changes nothing and produces
-    /// nothing. A stray tap of the Hotkey, or a port reporting late, must not be
-    /// able to derail a Dictation.
+    /// nothing. A stray press of the Hotkey, or a port reporting late, must not
+    /// be able to derail a Dictation.
     public mutating func receive(_ event: DictationEvent) -> [DictationEffect] {
         switch (state, event) {
-        case (.idle, .activationStarted), (.idle, .activationToggled):
+        case (.idle, .hotkeyPressed):
             state = .listening
+            thisPressOpenedTheDictation = true
             // Nothing carried over from the Dictation before this one: the app
             // that received the last Insertion must never receive this one by
             // default.
@@ -107,21 +169,72 @@ public struct DictationMachine: Sendable {
             // word spoken before the microphone is open is gone.
             return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent))]
 
-        case (.listening, .activationStopped), (.listening, .activationToggled):
-            state = .transcribing
-            // Who has focus is read first and at once: it is the definition of
-            // the Target App, and everything after this — closing the
-            // microphone, the Cue — takes long enough for the user to have
-            // clicked into another window.
+        case (.listening, .hotkeyPressed):
+            // A Dictation is already running, so this press is the second tap
+            // of a Toggle, and the Dictation stops here rather than when the
+            // key comes back up.
             //
-            // The microphone closes before the stop Cue plays, so the Cue is
-            // not one of the sounds the Engine is later asked to transcribe.
-            // The Pill says "transcribing" before the Engine is asked, so the
-            // pause that follows is never mistaken for a hang.
-            return [
-                .noteTargetApp, .stopCapturing, .playCue(.dictationStopped),
-                .showPill(.transcribing),
-            ]
+            // On the way down for two reasons. The user has finished speaking,
+            // so every millisecond between the press and the words appearing is
+            // spent from the latency budget (`docs/product-experience.md` §7).
+            // And a press that stopped nothing until it was let go of could
+            // fail to stop anything at all: type with the key still down and
+            // the press is spoiled, no release is ever reported, and the
+            // Dictation would go on listening to everything typed after it.
+            //
+            // The cost is that pressing the Hotkey to type an accented
+            // character mid-Dictation stops the Dictation. That is the
+            // documented meaning of the key while one is running, and the words
+            // are transcribed and kept rather than lost.
+            thisPressOpenedTheDictation = false
+            return stopListening()
+
+        case (.listening, .hotkeyReleased(let heldFor)):
+            // A release of a press that did not open this Dictation is nothing
+            // to it: the key was already down when Cheppu started watching, or
+            // what the user did with it turned out to be typing.
+            guard thisPressOpenedTheDictation else { return [] }
+            thisPressOpenedTheDictation = false
+
+            // Let go inside the threshold and the press was a tap, which leaves
+            // the Dictation running until the next press — the whole of Toggle.
+            // Held past it, letting go is the end of a Hold.
+            guard heldFor >= Self.holdThreshold else { return [] }
+            return stopListening()
+
+        case (.listening, .hotkeyPressSpoiled(let heldFor)):
+            guard thisPressOpenedTheDictation else {
+                // A press that did not open this Dictation, so what it turned
+                // into has nothing to do with it.
+                return []
+            }
+            thisPressOpenedTheDictation = false
+
+            guard heldFor < Self.holdThreshold else {
+                // Past the threshold the press is a Hold, and the user has been
+                // speaking into it. A key brushed at three seconds does not
+                // throw that away — audio is effort they cannot repeat
+                // (`docs/product-experience.md` §4) — so the Dictation ends
+                // here exactly as a Hold ends, and the words are transcribed
+                // and kept. It has to end here rather than wait for the key,
+                // because a spoiled press is never reported released.
+                return stopListening()
+            }
+            // This Dictation only ever existed because of a press that turns
+            // out to have been an é. It is handed back where it stands: the
+            // microphone closes, what it heard is let go of rather than
+            // transcribed, and the Pill comes down.
+            //
+            // No stop Cue answers the start Cue that has already played, which
+            // is the one place Cheppu leaves `docs/product-experience.md` §3's
+            // pair unmatched. It is the least bad of three: a stop Cue would
+            // say a Dictation had been taken and is being transcribed, which is
+            // the more misleading sound of the two, and holding the start Cue
+            // back until the threshold had passed would cost every real
+            // Dictation the confirmation it exists to give the instant the key
+            // goes down.
+            state = .idle
+            return [.stopCapturing, .hidePill]
 
         case (.transcribing, .targetAppNoted(let app)):
             targetApp = app
@@ -169,10 +282,30 @@ public struct DictationMachine: Sendable {
         case (.listening, .dictationFailed), (.transcribing, .dictationFailed),
             (.inserting, .dictationFailed):
             state = .idle
+            // Whatever the Hotkey is doing belongs to a Dictation that is over.
+            // Letting go of it must not stop the next one.
+            thisPressOpenedTheDictation = false
             return [.hidePill]
 
         default:
             return []
         }
+    }
+
+    /// Ends the Dictation that is Listening, whichever Activation ended it.
+    ///
+    /// Who has focus is read first and at once: it is the definition of the
+    /// Target App, and everything after this — closing the microphone, the Cue
+    /// — takes long enough for the user to have clicked into another window.
+    ///
+    /// The microphone closes before the stop Cue plays, so the Cue is not one of
+    /// the sounds the Engine is later asked to transcribe. The Pill says
+    /// "transcribing" before the Engine is asked, so the pause that follows is
+    /// never mistaken for a hang.
+    private mutating func stopListening() -> [DictationEffect] {
+        state = .transcribing
+        return [
+            .noteTargetApp, .stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing),
+        ]
     }
 }

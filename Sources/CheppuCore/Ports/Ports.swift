@@ -10,24 +10,34 @@ import Foundation
 
 /// What the user did with the Hotkey.
 ///
-/// The port reports the gesture and nothing about how it was produced — a tap of
-/// a bare modifier, a chord, or a test. Hold and Escape join it with their own
-/// tickets.
+/// The port reports the key going down and coming back up, and nothing about
+/// how either was produced — a bare modifier, a chord, or a test. Which of them
+/// is a Toggle and which a Hold is not in here: telling those apart takes the
+/// Clock and the answer to "is a Dictation already running", and the keyboard
+/// has neither. So the port reports the gesture and the machine decides, which
+/// is what keeps a press after the Cap has ended a Dictation a start rather
+/// than a stop nobody is waiting for. Escape joins them with #9.
 public enum HotkeyEvent: Equatable, Sendable {
-    /// The Hotkey was tapped on its own: pressed and released with no other key
-    /// held and nothing typed in between.
+    /// The Hotkey went down on its own: nothing else held, and nothing typed
+    /// with it yet.
+    case pressed
+
+    /// The Hotkey came back up, ending a press that was reported.
+    case released
+
+    /// The press turned out to be typing: a key was struck, or another modifier
+    /// joined it, while the Hotkey was held.
     ///
-    /// What a tap means depends on whether a Dictation is running, and the
-    /// keyboard is the one place that cannot know. So the port reports the tap
-    /// and the machine decides, which is what keeps a tap after the Cap has
-    /// ended a Dictation a start rather than a stop nobody is waiting for.
-    case tapped
+    /// Reported the moment it happens rather than when the key finally comes up,
+    /// because a Dictation that should never have started is one the microphone
+    /// should not still be open for.
+    case pressSpoiled
 }
 
 /// Where Activation gestures come from.
 public protocol HotkeyPort: Sendable {
-    /// Starts reporting Activation gestures, replacing any handler already
-    /// installed.
+    /// Starts reporting what the user does with the Hotkey, replacing any
+    /// handler already installed.
     ///
     /// Throwing means Cheppu may not watch the keyboard —
     /// `HotkeyFailure.accessibilityDenied` — so that a Hotkey which cannot work
@@ -147,9 +157,9 @@ public protocol FeedbackPort: Sendable {
 /// Every reading of the time the core takes.
 ///
 /// Nothing in the core calls a system clock directly, so a test can stamp a
-/// History entry, and later reach the Cap and the hold threshold, without
-/// waiting. The waiting half of this port arrives with the Cap, which is the
-/// first thing that needs it.
+/// History entry, and hold the Hotkey down for a second, without waiting. The
+/// waiting half of this port arrives with the Cap, which is the first thing
+/// that needs it.
 public protocol ClockPort: Sendable {
     func now() async -> Date
 }

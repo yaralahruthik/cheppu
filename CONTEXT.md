@@ -22,6 +22,10 @@ _Avoid_: click mode, tap mode
 An Activation where the Dictation runs only while the Hotkey is held down and stops on release.
 _Avoid_: push-to-talk, PTT, press-and-hold
 
+**Spoiled Press**:
+A press of the Hotkey that turns out to be typing — a key struck, or another modifier joined, inside the quarter-second that tells a tap from a Hold. The Dictation it opened on the way down is taken back at once and never transcribed: it ends a Dictation the user never asked for, unlike Cancel and Discard, which end one they meant. The start Cue has already played and no stop Cue answers it, which is the price of starting on the way down. A key struck later belongs to a Hold, and what was said is kept.
+_Avoid_: false trigger, accidental activation, misfire
+
 **Hotkey**:
 The single user-configurable key or key chord that performs Activation. Defaults to the right Option key on its own.
 _Avoid_: shortcut, keybinding

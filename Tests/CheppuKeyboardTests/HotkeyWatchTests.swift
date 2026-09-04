@@ -50,7 +50,7 @@ struct HotkeyWatchTests {
     func accessibilityGrantedAfterARefusalIsWatchedAtTheNextAttempt() async throws {
         let keyboard = FakeKeyboard()
         let watch = Self.watch(keyboard, accessibility: FakeAccessibilityAccess(answering: [false, true]))
-        let reported = ReportedActivations()
+        let reported = ReportedGestures()
 
         await #expect(throws: HotkeyFailure.accessibilityDenied) {
             try await watch.observe { _ in }
@@ -62,7 +62,8 @@ struct HotkeyWatchTests {
         try await watch.observe(reported.report)
         keyboard.strikes(Self.hotkeyDown, Self.everythingUp)
 
-        #expect(await reported.nextActivation() == .tapped)
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
     }
 
     @Test("A keyboard that cannot be watched takes the failure with it")
@@ -76,25 +77,28 @@ struct HotkeyWatchTests {
 
     // MARK: - What is reported
 
-    @Test("A tap of the Hotkey reaches whoever is listening for it")
-    func aTapOfTheHotkeyReachesWhoeverIsListeningForIt() async throws {
+    @Test("The Hotkey going down and coming back up reaches whoever is listening for it")
+    func theHotkeyGoingDownAndComingBackUpReachesWhoeverIsListeningForIt() async throws {
         let keyboard = FakeKeyboard()
         let watch = Self.watch(keyboard)
-        let reported = ReportedActivations()
+        let reported = ReportedGestures()
 
         try await watch.observe(reported.report)
         keyboard.strikes(Self.hotkeyDown, Self.everythingUp)
 
-        // Awaited rather than read back at the end: a tap that arrives once the
-        // user has moved on is not an Activation, it is a surprise.
-        #expect(await reported.nextActivation() == .tapped)
+        // Awaited rather than read back at the end: a press that arrives once
+        // the user has moved on is not an Activation, it is a surprise. And the
+        // press arrives before the release, because a Dictation starts on the
+        // way down.
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
     }
 
     @Test("What the user types passes by, and only the Hotkey is reported")
     func whatTheUserTypesPassesBy() async throws {
         let keyboard = FakeKeyboard()
         let watch = Self.watch(keyboard)
-        let reported = ReportedActivations()
+        let reported = ReportedGestures()
 
         try await watch.observe(reported.report)
         keyboard.strikes(
@@ -108,32 +112,34 @@ struct HotkeyWatchTests {
 
         // A sentence typed in someone else's app, and then the Hotkey. Only the
         // last of those is Cheppu's business.
-        #expect(await reported.nextActivation() == .tapped)
-        #expect(await reported.activations == [.tapped])
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
+        #expect(await reported.gestures == [.pressed, .released])
     }
 
     @Test("Watching again replaces the handler already installed")
     func watchingAgainReplacesTheHandlerAlreadyInstalled() async throws {
         let keyboard = FakeKeyboard()
         let watch = Self.watch(keyboard)
-        let first = ReportedActivations()
-        let second = ReportedActivations()
+        let first = ReportedGestures()
+        let second = ReportedGestures()
 
         try await watch.observe(first.report)
         try await watch.observe(second.report)
         keyboard.strikes(Self.hotkeyDown, Self.everythingUp)
 
-        #expect(await second.nextActivation() == .tapped)
-        // One tap is one Activation, however many times watching was started.
-        #expect(await first.activations.isEmpty)
+        #expect(await second.nextGesture() == .pressed)
+        #expect(await second.nextGesture() == .released)
+        // One press is one press, however many times watching was started.
+        #expect(await first.gestures.isEmpty)
         #expect(keyboard.timesWatched == 2)
     }
 
-    @Test("A press that began before Cheppu was watching is not a tap")
-    func aPressThatBeganBeforeCheppuWasWatchingIsNotATap() async throws {
+    @Test("A press that began before Cheppu was watching is not reported")
+    func aPressThatBeganBeforeCheppuWasWatchingIsNotReported() async throws {
         let keyboard = FakeKeyboard()
         let watch = Self.watch(keyboard)
-        let reported = ReportedActivations()
+        let reported = ReportedGestures()
 
         try await watch.observe { _ in }
         keyboard.strikes(Self.hotkeyDown)
@@ -143,7 +149,10 @@ struct HotkeyWatchTests {
         try await watch.observe(reported.report)
         keyboard.strikes(Self.everythingUp, Self.hotkeyDown, Self.everythingUp)
 
-        #expect(await reported.nextActivation() == .tapped)
-        #expect(await reported.activations == [.tapped])
+        // The key coming up is not a release of a press this watch reported,
+        // and the press that follows it is reported whole.
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
+        #expect(await reported.gestures == [.pressed, .released])
     }
 }

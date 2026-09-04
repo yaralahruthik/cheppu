@@ -4,10 +4,14 @@ import Foundation
 
 /// The Hotkey the tests press.
 ///
-/// A real one watches the whole keyboard for one key; this one is tapped when
+/// A real one watches the whole keyboard for one key; this one is pressed when
 /// the test says so, which is the same thing to the core. It can also be a
 /// keyboard Cheppu is not allowed to watch, which is what a machine without
 /// Accessibility granted looks like from here.
+///
+/// How long a press lasted is not in here, because it is not in a real keyboard
+/// either: a test holds the Hotkey down by moving the Clock between pressing it
+/// and letting go.
 actor FakeHotkey: HotkeyPort {
     private let isAccessibilityGranted: Bool
     private var reportTo: (@Sendable (HotkeyEvent) async -> Void)?
@@ -21,15 +25,26 @@ actor FakeHotkey: HotkeyPort {
         reportTo = handler
     }
 
-    /// The user taps the Hotkey.
+    /// The user presses the Hotkey.
     ///
-    /// Waits for everything the tap set in motion, so a test can tap twice and
-    /// then read back a whole Dictation.
-    func tap() async {
-        await reportTo?(.tapped)
+    /// Waits for everything the press set in motion, so a test can press and
+    /// let go and then read back a whole Dictation.
+    func press() async {
+        await reportTo?(.pressed)
     }
 
-    /// Whether anything is listening for a tap.
+    /// The user lets go of it.
+    func release() async {
+        await reportTo?(.released)
+    }
+
+    /// The user types with it held down, which is an accented character rather
+    /// than an Activation.
+    func typeWithItHeld() async {
+        await reportTo?(.pressSpoiled)
+    }
+
+    /// Whether anything is listening for the Hotkey.
     var isBeingWatched: Bool { reportTo != nil }
 }
 
