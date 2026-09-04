@@ -1,0 +1,63 @@
+docs/product-experience.md
+  s_da8864091d4a53::t_351406eb4f5496 40
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_da8864091d4a53::t_416276f80f0b9d 166-173,177-178,184-188,210-211,216-217,219,221-223,225-227,230-232
+  s_da8864091d4a53::t_3f497ec08c95a8 239-241
+Sources/CheppuCore/Ports/Ports.swift
+  s_da8864091d4a53::t_f8045b8e671895 141-145,149-154,156-162,191-194,201-203
+Sources/CheppuCore/Dictation/Dictation.swift
+  s_da8864091d4a53::t_58cd476f756d9e 160-161,170-178
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_da8864091d4a53::t_fb0c0635d7844c 83-85,140-143,176,181-189,262-286
+  s_da8864091d4a53::t_24566ad78f6adc 251-258
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_da8864091d4a53::t_780c44d31b8855 499-500,507-509,513-515,517,780-882
+  s_da8864091d4a53::t_64984a91b12dc4 378-392
+Tests/CheppuCoreTests/Fakes/PortJournal.swift
+  s_da8864091d4a53::t_416276f80f0b9d 22
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_da8864091d4a53::t_3cf94e5e1ec24a 541-551
+  s_da8864091d4a53::t_7295c747b70d59 96-117,120-125,159-174,203-211,243-252
+  s_da8864091d4a53::t_cf3dfbb09b408e 274,276,482
+  s_da8864091d4a53::t_4559b2d7b0cbb6 413-415,417-418,436,441,446-467,503-504,506-511,513-522
+  s_da8864091d4a53::t_1458de01efe6db 428-432,442-445
+  s_da8864091d4a53::t_e7018093a13716 253,468-469
+Sources/CheppuInsertion/Pasteboard.swift
+  s_da8864091d4a53::t_f8045b8e671895 91-93,97,99
+CONTEXT.md
+  s_da8864091d4a53::t_36da9f57e69dac 62,86
+  s_da8864091d4a53::t_4184a26f16def7 92
+  s_da8864091d4a53::t_351406eb4f5496 103-106
+Sources/CheppuFeedback/PillView.swift
+  s_da8864091d4a53::t_b74147898e853e 47-56
+  s_da8864091d4a53::t_fd0a4906361494 6,22-26,45-46,57-58,93,150,154-170
+  s_da8864091d4a53::t_1eed26938f858a 171-172
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_da8864091d4a53::t_e224c9bd89fab8 50,60,69,74,81,88-91
+  s_da8864091d4a53::t_343eb2c351db10 609,900-1040
+  s_da8864091d4a53::t_5a44fc34dd5ea3 570-574,671,675-676,681,695-697
+  s_da8864091d4a53::t_64984a91b12dc4 583-589,591,593,597-608
+  s_da8864091d4a53::t_55ce197d3cf720 92-93,610
+Sources/CheppuCore/Insertion/InsertionFailure.swift
+  s_da8864091d4a53::t_f8045b8e671895 9-12
+docs/adr/0009-history-is-a-file-of-its-own-not-a-preference.md
+  s_da8864091d4a53::t_351406eb4f5496 28
+README.md
+  s_da8864091d4a53::t_4184a26f16def7 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "d43f9b029c4bfffb60516160c7c778098d1adeed",
+  "prompts": {},
+  "sessions": {
+    "s_da8864091d4a53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fd91d0a-c8b0-41d7-8169-6f3b7bd27109",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
