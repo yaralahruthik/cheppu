@@ -1,0 +1,99 @@
+Sources/CheppuKeyboard/Keyboard.swift
+  s_efda81755ec6f5::t_8b5376fdf89525 255-266
+Sources/Cheppu/MenuBarController.swift
+  s_efda81755ec6f5::t_5d1803fa54a4aa 9,38,40-51,53,85-88,95,151-152,172-177,184-185,193-194,196
+  s_efda81755ec6f5::t_2382c0e4418551 178-183,198-200
+  s_efda81755ec6f5::t_6c6fd845da61bb 52
+Sources/CheppuSettings/Preferences.swift
+  s_efda81755ec6f5::t_a39ca9df64e454 1-98
+Sources/CheppuCore/Ports/Ports.swift
+  s_efda81755ec6f5::t_dc376137f32956 172-195
+Sources/CheppuSettings/SystemSettingsPane.swift
+  s_efda81755ec6f5::t_a39ca9df64e454 1-37
+Sources/CheppuSettings/SettingsWindow.swift
+  s_efda81755ec6f5::t_c8ad56f2452b3d 33-36,54,60,160-164,166,183,218,222-232,236-255
+  s_efda81755ec6f5::t_041d6980df8c45 286,288-290,293-295,298-299,303-308,310
+  s_efda81755ec6f5::t_31a22925460dee 343-393,395,401,405-407,411,414-415
+  s_efda81755ec6f5::t_7c0b8ac7e2e180 1-32,37-53,55-59,61-124,129-130,135-159,165,167-182,184-190,192-197,199-217,219-221,233-235,256-285,287,291-292,296-297,300-302,309,311-334,339-341,397-400,402-404,408-410,412-413,416-426
+  s_efda81755ec6f5::t_2382c0e4418551 125-128,131-134
+  s_efda81755ec6f5::t_71e96e6653556a 191,198,335-338,394,396
+  s_efda81755ec6f5::t_a596e7b485b261 342
+Sources/CheppuCore/MenuBarMenu.swift
+  s_efda81755ec6f5::t_63e799c71ffce4 20-27,30,46,61-65,75,82-84,98
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_efda81755ec6f5::t_79a0addd243864 283
+  s_efda81755ec6f5::t_8cf0f092c015e4 286-288,295,301
+  s_efda81755ec6f5::t_1c29dca883b01c 284-285,289-294,296-300,302-304
+  s_efda81755ec6f5::t_df3d44dcb6b966 51,71-72,79
+docs/adr/0010-settings-are-read-where-they-are-used.md
+  s_efda81755ec6f5::t_12bdff1afe0c2b 1-30
+Sources/CheppuFeedback/PillAndCues.swift
+  s_efda81755ec6f5::t_dc376137f32956 20-24,26,28
+Tests/CheppuCoreTests/SettingsScreenTests.swift
+  s_efda81755ec6f5::t_29d512ac6fa947 141-145
+  s_efda81755ec6f5::t_a814c4f9c3c0ba 89-113
+  s_efda81755ec6f5::t_ddb1ef1740738f 1-88,114-140,146-165
+CONTEXT.md
+  s_efda81755ec6f5::t_a3d33814c441f1 111,113-114
+  s_efda81755ec6f5::t_4d864263a96f0a 112
+README.md
+  s_efda81755ec6f5::t_a3d33814c441f1 36,72,75
+  s_efda81755ec6f5::t_d2ce73e5f8356f 66-67,92
+  s_efda81755ec6f5::t_ab13e3caaa2e92 87
+Sources/CheppuCore/Cleanup/Cleanup.swift
+  s_efda81755ec6f5::t_1586b6a3103f2f 141-142
+  s_efda81755ec6f5::t_bf07ec19830276 134-140,143-148,174-182
+Sources/CheppuSettings/LaunchAtLogin.swift
+  s_efda81755ec6f5::t_a39ca9df64e454 1-46
+Tests/CheppuCoreTests/CleanupTests.swift
+  s_efda81755ec6f5::t_8cf0f092c015e4 374-377,379-380,382-385
+  s_efda81755ec6f5::t_5c616c2b1f898e 371-373,378,381,386
+Package.swift
+  s_efda81755ec6f5::t_20f5f12c86ac03 84-94,100,138-142
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_efda81755ec6f5::t_df3d44dcb6b966 56-71,75-77
+  s_efda81755ec6f5::t_8cf0f092c015e4 72-74
+Tests/CheppuCoreTests/MenuBarMenuTests.swift
+  s_efda81755ec6f5::t_cf0e397e35ad46 15-16,19,23-33,48-49,69,81
+Sources/Cheppu/AccessibilityRequest.swift
+  s_efda81755ec6f5::t_5d1803fa54a4aa 2-3,34-37
+Scripts/check-settings-are-one-domain.sh
+  s_efda81755ec6f5::t_7455c11edc1f8d 1-24
+.github/workflows/ci.yml
+  s_efda81755ec6f5::t_ab13e3caaa2e92 51-53
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_efda81755ec6f5::t_205a8c5141fd2d 22,38-41,43,53-54,238-246
+Tests/CheppuSettingsTests/SystemSettingsPaneTests.swift
+  s_efda81755ec6f5::t_4d864263a96f0a 1-39
+Sources/CheppuHistory/HistoryWindow.swift
+  s_efda81755ec6f5::t_2382c0e4418551 51-61
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_efda81755ec6f5::t_22c7c716a3b8b4 271-272
+  s_efda81755ec6f5::t_205a8c5141fd2d 216-221,264-270
+Tests/CheppuSettingsTests/PreferencesTests.swift
+  s_efda81755ec6f5::t_11cbd60b14b14c 13,17,21-22,33-34,49-50,66-67,82-83,98-99
+  s_efda81755ec6f5::t_edf86457536904 1-12,14-16,18-20,23-32,35-48,51-65,68-81,84-97,100-108
+Sources/CheppuAudio/Microphone.swift
+  s_efda81755ec6f5::t_8b5376fdf89525 122-137
+Sources/Cheppu/SystemPermissions.swift
+  s_efda81755ec6f5::t_8b5376fdf89525 1-26
+Sources/CheppuCore/Settings/SettingsScreen.swift
+  s_efda81755ec6f5::t_6943859dba0f6f 1-19,141-145,148,171-181
+  s_efda81755ec6f5::t_b4b47f2246e006 20-140,146-147,149-170,182-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "3658e998be41c6067bc5efb6584a8cabf2ec4bcb",
+  "prompts": {},
+  "sessions": {
+    "s_efda81755ec6f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9968a103-3b3e-4255-8428-0db23a8c502e",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
