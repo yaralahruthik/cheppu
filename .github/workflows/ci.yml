@@ -33,6 +33,9 @@ jobs:
       - name: The Hotkey never swallows a keystroke
         run: ./Scripts/check-the-hotkey-never-swallows-a-keystroke.sh
 
+      - name: Cheppu types one keystroke
+        run: ./Scripts/check-cheppu-types-one-keystroke.sh
+
       # No Engine downloaded, no model, no microphone and nothing granted on
       # this runner: the suite has to be green all the same, which is the whole
       # point of the ports.

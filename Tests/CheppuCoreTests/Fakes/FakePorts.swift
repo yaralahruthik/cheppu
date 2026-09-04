@@ -71,24 +71,70 @@ struct FakeEngine: EnginePort {
     }
 }
 
-/// Insertion into a Target App that is only ever asked what it was told to
-/// insert.
-struct FakeInsertion: InsertionPort {
-    let journal: PortJournal
+/// The two apps the user is working in: the one they were writing an email in,
+/// and the one they switched to.
+enum ATargetApp {
+    static let mail = TargetApp(bundleIdentifier: "com.apple.mail", processIdentifier: 501)
+    static let browser = TargetApp(bundleIdentifier: "com.apple.Safari", processIdentifier: 502)
+}
 
-    func insert(_ finalText: FinalText) async throws {
-        await journal.record(.inserted(finalText))
+/// Where the keyboard is pointing, as the test says it is.
+///
+/// A real Insertion asks macOS which app is frontmost; this one is told, and
+/// can be told again mid-Dictation, which is how a test moves the user from one
+/// app to another while they are still speaking.
+actor FakeFocus {
+    private(set) var app: TargetApp?
+
+    init(on app: TargetApp?) {
+        self.app = app
+    }
+
+    /// The user clicks into another app.
+    func moveTo(_ app: TargetApp?) {
+        self.app = app
     }
 }
 
-/// An Insertion that will not go through, whatever the reason. What the user is
-/// told about it is the Clipboard Fallback ticket's; all this fake is for is
-/// showing that a Dictation which fails still ends.
-struct RefusingInsertion: InsertionPort {
+/// Insertion into a Target App that is only ever asked what it was told to
+/// insert, and where.
+struct FakeInsertion: InsertionPort {
+    /// What this Insertion does when it is finally asked to put the words
+    /// somewhere.
+    enum Outcome {
+        /// It lands, and the journal says where.
+        case lands
+
+        /// It will not go through, for a reason the user is not told yet. What
+        /// they are told is the Clipboard Fallback ticket's; all this outcome
+        /// is for is showing that a Dictation which fails still ends.
+        case refuses
+
+        /// The user has moved to another app while the Engine worked, so it is
+        /// abandoned rather than typed into the wrong window.
+        case findsTheFocusMoved
+    }
+
+    /// An Insertion that would not go through, whatever the reason.
     struct Refused: Error {}
 
-    func insert(_ finalText: FinalText) async throws {
-        throw Refused()
+    let journal: PortJournal
+    let focus: FakeFocus
+    var outcome: Outcome = .lands
+
+    func focusedApp() async -> TargetApp? {
+        await focus.app
+    }
+
+    func insert(_ finalText: FinalText, into targetApp: TargetApp) async throws {
+        switch outcome {
+        case .lands:
+            await journal.record(.inserted(finalText, into: targetApp))
+        case .refuses:
+            throw Refused()
+        case .findsTheFocusMoved:
+            throw InsertionFailure.focusMoved
+        }
     }
 }
 

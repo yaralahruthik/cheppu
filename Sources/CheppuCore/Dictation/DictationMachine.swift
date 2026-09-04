@@ -34,6 +34,11 @@ public enum DictationEvent: Equatable, Sendable {
     /// without the Hotkey — the Cap, a Cancel, a failure — would leave that
     /// copy wrong and the next tap doing the opposite of what the user meant.
     case activationToggled
+
+    /// Who had focus at the moment the Dictation stopped, which is who the
+    /// Insertion is for. Nothing, where no app had focus at all.
+    case targetAppNoted(TargetApp?)
+
     case audioCaptured(CapturedAudio)
     case inputLevelChanged(InputLevel)
     case rawTranscriptReceived(RawTranscript)
@@ -54,12 +59,17 @@ public enum DictationEvent: Equatable, Sendable {
 public enum DictationEffect: Equatable, Sendable {
     case startCapturing
     case stopCapturing
+
+    /// Ask who has focus, so that the Insertion has somewhere to go once the
+    /// Engine is done.
+    case noteTargetApp
+
     case transcribe(CapturedAudio)
     case playCue(Cue)
     case showPill(PillState)
     case hidePill
     case recordInHistory(FinalText)
-    case insert(FinalText)
+    case insert(FinalText, into: TargetApp)
 }
 
 /// The lifecycle of a Dictation, and the whole of Cheppu's decision-making.
@@ -69,6 +79,11 @@ public enum DictationEffect: Equatable, Sendable {
 /// assertable as a list of effects, in order, with nothing granted or installed.
 public struct DictationMachine: Sendable {
     private(set) var state: DictationState
+
+    /// Who this Dictation is for, from the moment it stopped. Held here rather
+    /// than looked up again when the words are ready, because by then the user
+    /// may be somewhere else and the answer would be the wrong app.
+    private var targetApp: TargetApp?
 
     public init() {
         self.state = .idle
@@ -84,17 +99,33 @@ public struct DictationMachine: Sendable {
         switch (state, event) {
         case (.idle, .activationStarted), (.idle, .activationToggled):
             state = .listening
+            // Nothing carried over from the Dictation before this one: the app
+            // that received the last Insertion must never receive this one by
+            // default.
+            targetApp = nil
             // Capture opens before the Cue plays: the sound is feedback, but a
             // word spoken before the microphone is open is gone.
             return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent))]
 
         case (.listening, .activationStopped), (.listening, .activationToggled):
             state = .transcribing
-            // The microphone closes first, so the stop Cue is not one of the
-            // sounds the Engine is later asked to transcribe. The Pill says
-            // "transcribing" before the Engine is asked, so the pause that
-            // follows is never mistaken for a hang.
-            return [.stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing)]
+            // Who has focus is read first and at once: it is the definition of
+            // the Target App, and everything after this — closing the
+            // microphone, the Cue — takes long enough for the user to have
+            // clicked into another window.
+            //
+            // The microphone closes before the stop Cue plays, so the Cue is
+            // not one of the sounds the Engine is later asked to transcribe.
+            // The Pill says "transcribing" before the Engine is asked, so the
+            // pause that follows is never mistaken for a hang.
+            return [
+                .noteTargetApp, .stopCapturing, .playCue(.dictationStopped),
+                .showPill(.transcribing),
+            ]
+
+        case (.transcribing, .targetAppNoted(let app)):
+            targetApp = app
+            return []
 
         case (.listening, .inputLevelChanged(let level)):
             // Only while Listening. The last buffer the microphone heard can
@@ -110,10 +141,24 @@ public struct DictationMachine: Sendable {
             // Cleanup stands between the Raw Transcript and the Final Text from
             // its own ticket onwards. Until then the words go in as heard.
             let finalText = FinalText(transcript.text)
+
+            // Nothing had focus when the Dictation stopped, so there is nowhere
+            // for the words to be typed. They are still the user's — History is
+            // written all the same — and the Dictation ends rather than waiting
+            // for an Insertion that cannot come. Saying so out loud, and
+            // leaving the text on the clipboard, is #14's.
+            guard let targetApp else {
+                state = .idle
+                return [.recordInHistory(finalText), .hidePill]
+            }
+
             state = .inserting
             // History first, always: a crash during Insertion then costs the
             // user an inconvenience rather than the thing they said.
-            return [.recordInHistory(finalText), .insert(finalText)]
+            return [
+                .recordInHistory(finalText),
+                .insert(finalText.normalisedForInsertion, into: targetApp),
+            ]
 
         case (.inserting, .insertionSucceeded):
             state = .idle

@@ -47,10 +47,23 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // The pasteboard and the one keystroke Cheppu ever types: Insertion.
+        // A target of its own rather than part of the app so that what the
+        // Target App is handed, what the user's clipboard looks like
+        // afterwards, and what happens when the user has moved on are testable
+        // with no clipboard of theirs to borrow and no keystroke ever leaving
+        // the suite.
+        .target(
+            name: "CheppuInsertion",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
-            dependencies: ["CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard"]
+            dependencies: [
+                "CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard", "CheppuInsertion",
+            ]
         ),
 
         .testTarget(
@@ -71,6 +84,11 @@ let package = Package(
         .testTarget(
             name: "CheppuKeyboardTests",
             dependencies: ["CheppuKeyboard"]
+        ),
+
+        .testTarget(
+            name: "CheppuInsertionTests",
+            dependencies: ["CheppuInsertion"]
         ),
     ],
     swiftLanguageModes: [.v6]

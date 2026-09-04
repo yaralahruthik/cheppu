@@ -1,15 +1,25 @@
 import AppKit
+import CheppuAudio
 import CheppuCore
+import CheppuEngine
+import CheppuInsertion
 import CheppuKeyboard
 
 /// Renders the core's `MenuBarMenu` as a status item, performs the action behind
-/// whichever item the user picks, and keeps Cheppu watching for the Hotkey.
+/// whichever item the user picks, wires a Dictation to the machine it runs on,
+/// and keeps Cheppu watching for the Hotkey.
 ///
-/// This is glue: it holds no decisions of its own, which is why it is not tested.
+/// This is glue: what it does is assemble and render. The one thing it decides
+/// for itself — fetching the Engine at launch, with nothing shown — is a
+/// placeholder that Onboarding takes over (#20). That is why it is not tested.
 @MainActor
 final class MenuBarController: NSObject, NSApplicationDelegate {
-    private let hotkey = HotkeyWatch()
     private var statusItem: NSStatusItem?
+
+    /// The Dictation, and every port it is wired to. Held here for the life of
+    /// the app: the Hotkey watch reports to it weakly, so a core nobody keeps
+    /// is a Hotkey that does nothing.
+    private var dictations: DictationCore?
 
     /// Whether the Hotkey is being watched. Everything the menu says about
     /// Accessibility hangs off this.
@@ -27,7 +37,54 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         self.statusItem = statusItem
         showMenu()
 
-        watchForTheHotkey()
+        runDictations()
+    }
+
+    /// Wires a Dictation to the machine it runs on, and sets it going.
+    ///
+    /// This is the whole of Cheppu in one place: the keyboard the Hotkey is
+    /// watched on, the microphone it listens through, the Engine that hears it,
+    /// and the pasteboard the words are put where the cursor is with.
+    private func runDictations() {
+        let parakeet = try? ParakeetEngine()
+        // A machine with nowhere to keep the Engine still gets a Hotkey, and
+        // is still asked for Accessibility. What it does not get is a Dictation
+        // that can be transcribed, and that is said where it happens rather
+        // than by the app never starting.
+        let engine: any EnginePort = parakeet ?? EngineWithNowhereToLive()
+
+        let dictations = DictationCore(
+            hotkey: HotkeyWatch(),
+            audio: MicrophoneCapture(),
+            engine: engine,
+            insertion: PasteInsertion(),
+            clipboard: SystemClipboard(),
+            history: UnkeptHistory(),
+            feedback: SilentFeedback(),
+            clock: SystemClock()
+        )
+        self.dictations = dictations
+
+        if let parakeet { putTheEngineOnTheMachine(parakeet) }
+        watchForTheHotkey(with: dictations)
+    }
+
+    /// Fetches the Engine if it is not here yet, so that the first Dictation
+    /// has something to be transcribed by.
+    ///
+    /// Silent, and at launch rather than when the user asks: Onboarding is
+    /// where a 480 MB download gets a face — a size, real progress, and a first
+    /// Dictation to end on (#20). Until then this is the difference between a
+    /// fresh machine that dictates and one whose Hotkey works and whose words
+    /// go nowhere.
+    private func putTheEngineOnTheMachine(_ engine: ParakeetEngine) {
+        Task {
+            guard await !engine.isEngineDownloaded() else { return }
+            // What an interrupted download leaves behind is picked up by the
+            // next attempt rather than started over, so a failure here costs
+            // the next launch nothing.
+            try? await engine.downloadEngine { _ in }
+        }
     }
 
     /// Starts watching for the Hotkey, and says why it cannot if it cannot.
@@ -35,18 +92,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// The reason is given once, when Cheppu first finds it cannot watch; the
     /// menu goes on saying it for as long as it is true, because a user whose
     /// Hotkey does nothing has nowhere else to look.
-    private func watchForTheHotkey() {
+    private func watchForTheHotkey(with dictations: DictationCore) {
         Task { [weak self] in
             var hasSaidWhy = false
             while let self, !Task.isCancelled {
                 do {
-                    // A tap has nowhere to go yet. A Dictation needs an
-                    // Insertion to end in, which is #7, and that is the ticket
-                    // that hands these gestures to a `DictationCore`. What
-                    // watching buys today is the rest of this one: Accessibility
-                    // asked for at the moment the Hotkey needs it, and a Hotkey
-                    // the app can say is not working.
-                    try await hotkey.observe { _ in }
+                    try await dictations.watchForActivations()
                     canSeeTheHotkey = true
                     showMenu()
                     return
