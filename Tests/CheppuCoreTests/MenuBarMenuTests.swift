@@ -12,12 +12,23 @@ struct MenuBarMenuTests {
         #expect(MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items.contains(.quit))
     }
 
-    @Test("With the Hotkey working, the menu is History, the Cues and Quit")
-    func withTheHotkeyWorkingTheMenuIsHistoryTheCuesAndQuit() {
+    @Test("With the Hotkey working, the menu is History, the Cues, Settings and Quit")
+    func withTheHotkeyWorkingTheMenuIsHistoryTheCuesSettingsAndQuit() {
         #expect(
             MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items
-                == [.history, .cues(areOn: true), .quit]
+                == [.history, .cues(areOn: true), .settings, .quit]
         )
+    }
+
+    @Test("Settings is opened from the menu bar, and by the key every other app uses")
+    func settingsIsOpenedFromTheMenuBar() {
+        // The menu is the only part of Cheppu the user can reach — no Dock
+        // icon, and no window until one is asked for — so a settings window
+        // that could not be opened from it could not be opened at all. Its
+        // title says it opens something, and Command-comma is what every other
+        // app on the machine has taught the user to press.
+        #expect(MenuBarItem.settings.title == "Settings\u{2026}")
+        #expect(MenuBarItem.settings.shortcutKey == ",")
     }
 
     @Test("History is opened from the menu bar")
@@ -34,8 +45,8 @@ struct MenuBarMenuTests {
     func theMenuSaysWhichWayTheCueSwitchIsSet() {
         // Turning the sounds off is something someone does on their way into a
         // meeting, with one hand, in the two seconds before they start talking.
-        // That is a menu bar item rather than a settings window (#15), and it
-        // has to say which way it is set without being clicked.
+        // That is a menu bar item as well as a line in Settings, and it has to
+        // say which way it is set without being clicked.
         #expect(MenuBarItem.cues(areOn: true).isTicked)
         #expect(!MenuBarItem.cues(areOn: false).isTicked)
         #expect(MenuBarItem.cues(areOn: true).title == MenuBarItem.cues(areOn: false).title)
@@ -55,7 +66,7 @@ struct MenuBarMenuTests {
         // they opened the menu.
         #expect(
             MenuBarMenu(canSeeTheHotkey: false, areCuesOn: true).items
-                == [.allowAccessibility, .history, .cues(areOn: true), .quit]
+                == [.allowAccessibility, .history, .cues(areOn: true), .settings, .quit]
         )
         #expect(MenuBarItem.allowAccessibility.title.contains("Accessibility"))
     }
@@ -67,6 +78,7 @@ struct MenuBarMenuTests {
         #expect(!MenuBarItem.quit.isTicked)
         #expect(!MenuBarItem.allowAccessibility.isTicked)
         #expect(!MenuBarItem.history.isTicked)
+        #expect(!MenuBarItem.settings.isTicked)
     }
 
     @Test("An item with no shortcut claims no key")

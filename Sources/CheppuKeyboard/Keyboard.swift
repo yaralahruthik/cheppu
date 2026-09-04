@@ -252,6 +252,18 @@ extension ModifierKeys {
         ]
 }
 
+/// Whether Cheppu may watch the keyboard, as macOS has already answered it.
+///
+/// Public for the same reason `MicrophonePermission` is: Settings says whether
+/// the permission is there, and saying so must cost the user neither a prompt
+/// nor a Dictation. Nothing is asked and nothing is prompted — there is no
+/// prompt for this one in the first place.
+public enum AccessibilityPermission {
+    public static var isGranted: Bool {
+        SystemAccessibilityAccess().isGranted
+    }
+}
+
 /// Accessibility as macOS answers it.
 struct SystemAccessibilityAccess: AccessibilityAccess {
     /// Reports the existing decision and never prompts.

@@ -213,9 +213,12 @@ public struct DictationMachine: Sendable {
     /// Target App.
     ///
     /// Held here rather than reached for, because which rules are on is the
-    /// user's and not the machine's: the app hands it whichever switches the
-    /// Settings window (#15) is showing, and the machine applies them.
-    private let cleanup: Cleanup
+    /// user's and not the machine's: the machine applies whichever switches it
+    /// was last handed. `DictationCore` reads them off the user's switches on
+    /// the way out of the Engine, so the rules that clean a Dictation are the
+    /// ones the Settings window was showing while it was being spoken
+    /// (ADR-0010).
+    private var cleanup: Cleanup
 
     private(set) var state: DictationState
 
@@ -256,6 +259,15 @@ public struct DictationMachine: Sendable {
     public init(cleaningWith rules: CleanupRules = .all) {
         self.state = .idle
         self.cleanup = Cleanup(rules)
+    }
+
+    /// Takes the switches the user has set, for every Dictation from here on.
+    ///
+    /// Handed in rather than read, because the machine has nowhere to read
+    /// anything from: it is events in and effects out, and a preference is
+    /// neither.
+    public mutating func clean(with rules: CleanupRules) {
+        cleanup = Cleanup(rules)
     }
 
     /// Takes an event and answers with what should happen, in the order it

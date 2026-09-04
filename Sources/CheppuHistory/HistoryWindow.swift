@@ -48,6 +48,17 @@ public final class HistoryWindow: NSObject {
         }
     }
 
+    /// Draws History again where the window is open, because the store was
+    /// emptied somewhere else — the button in the Settings window.
+    ///
+    /// A window still listing what the user has just asked Cheppu to forget
+    /// would be the one lie History cannot afford to tell, even for as long as
+    /// it takes them to click on it again.
+    public func redrawIfShowing() {
+        guard window?.isVisible == true else { return }
+        Task { fill(with: await store.read()) }
+    }
+
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: Self.size),

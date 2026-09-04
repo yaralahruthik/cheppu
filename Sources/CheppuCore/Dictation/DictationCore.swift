@@ -19,6 +19,7 @@ public actor DictationCore {
     private var isDraining = false
 
     private let hotkey: any HotkeyPort
+    private let cleanup: any CleanupSwitches
     private let audio: any AudioCapturePort
     private let engine: any EnginePort
     private let insertion: any InsertionPort
@@ -34,11 +35,12 @@ public actor DictationCore {
     /// the key down for a second without waiting one.
     private var hotkeyPressedAt: Date?
 
-    /// - Parameter rules: which Cleanup rules a Dictation's words go through on
-    ///   their way to the Target App. Every rule on unless the user has turned
-    ///   one off.
+    /// - Parameter cleanup: which Cleanup rules a Dictation's words go through
+    ///   on their way to the Target App. A port rather than a value, so that a
+    ///   switch the user moves in Settings is read by the next Dictation
+    ///   without anything being told about it (ADR-0010).
     public init(
-        cleaningWith rules: CleanupRules,
+        cleaningWith cleanup: any CleanupSwitches,
         hotkey: any HotkeyPort,
         audio: any AudioCapturePort,
         engine: any EnginePort,
@@ -48,7 +50,8 @@ public actor DictationCore {
         feedback: any FeedbackPort,
         clock: any ClockPort
     ) {
-        self.machine = DictationMachine(cleaningWith: rules)
+        self.machine = DictationMachine()
+        self.cleanup = cleanup
         self.hotkey = hotkey
         self.audio = audio
         self.engine = engine
@@ -232,7 +235,15 @@ public actor DictationCore {
             return .targetAppNoted(await insertion.focusedApp())
 
         case .transcribe(let spoken):
-            return .rawTranscriptReceived(try await engine.transcribe(spoken))
+            let transcript = try await engine.transcribe(spoken)
+            // The user's switches are read here, on the way back from the
+            // Engine, because this is the last moment before Cleanup runs. Read
+            // at each Dictation rather than held from launch, exactly as the
+            // Cue switch is: a rule turned off in Settings is off for the words
+            // being spoken while the window is still open, and there is nothing
+            // to keep in step (ADR-0010).
+            machine.clean(with: await cleanup.rules())
+            return .rawTranscriptReceived(transcript)
 
         case .playCue(let cue):
             await feedback.play(cue)

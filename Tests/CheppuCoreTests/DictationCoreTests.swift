@@ -48,6 +48,7 @@ struct DictationCoreTests {
         let hotkey: FakeHotkey
         let focus: FakeFocus
         let clipboard: FakeClipboard
+        let cleanup: FakeCleanupSwitches
         let core: DictationCore
 
         init(
@@ -67,13 +68,15 @@ struct DictationCoreTests {
             let hotkey = FakeHotkey(isAccessibilityGranted: isAccessibilityGranted)
             let focus = FakeFocus(on: app)
             let clipboard = FakeClipboard(journal: journal, holding: hadCopied)
+            let cleanup = FakeCleanupSwitches(rules)
+            self.cleanup = cleanup
             self.journal = journal
             self.clock = clock
             self.hotkey = hotkey
             self.focus = focus
             self.clipboard = clipboard
             self.core = DictationCore(
-                cleaningWith: rules,
+                cleaningWith: cleanup,
                 hotkey: hotkey,
                 audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
@@ -276,6 +279,28 @@ struct DictationCoreTests {
         // wrote, so the boundary flattens every one of them rather than only the
         // Paragraph Breaks it knows it made.
         #expect(await scenario.insertedText == ["ls rm -rf /"])
+    }
+
+    @Test("A switch moved in Settings is the switch the next Dictation goes through")
+    func aSwitchMovedInSettingsIsTheSwitchTheNextDictationGoesThrough() async throws {
+        // The user dictates, decides they wanted what they said left alone,
+        // and turns the rules off. What that has to cost them is the flicking —
+        // not a relaunch, and not a Dictation spent finding out whether it took
+        // (`docs/product-experience.md` §8). The switches are read on the way
+        // out of the Engine, so the next thing they say is cleaned the way the
+        // window in front of them says it will be.
+        let scenario = Scenario(hears: ARawTranscript.saidWithAPause)
+
+        try await scenario.toggleADictation()
+        await scenario.cleanup.set(.off)
+        try await scenario.toggleADictation()
+
+        #expect(
+            await scenario.insertedText == [
+                "That is one thought.\nThe next one",
+                "um, that is one thought. the next one",
+            ]
+        )
     }
 
     @Test("With every Cleanup rule off, what lands is the Raw Transcript")

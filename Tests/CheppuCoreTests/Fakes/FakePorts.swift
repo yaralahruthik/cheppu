@@ -53,6 +53,28 @@ actor FakeHotkey: HotkeyPort {
     var isBeingWatched: Bool { reportTo != nil }
 }
 
+/// The Cleanup switches, as the user left them — and as they can move them
+/// while a Dictation is being transcribed.
+///
+/// A real one is a window and a preferences file; this one is a value the test
+/// sets, which is the same thing to the core.
+actor FakeCleanupSwitches: CleanupSwitches {
+    private var on: CleanupRules
+
+    init(_ rules: CleanupRules = .all) {
+        self.on = rules
+    }
+
+    func rules() async -> CleanupRules {
+        on
+    }
+
+    /// The user goes to Settings and leaves the switches like this.
+    func set(_ rules: CleanupRules) {
+        on = rules
+    }
+}
+
 /// Audio capture that hands back canned audio without a microphone.
 struct FakeAudioCapture: AudioCapturePort {
     let journal: PortJournal

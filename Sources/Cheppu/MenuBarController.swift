@@ -6,6 +6,7 @@ import CheppuFeedback
 import CheppuHistory
 import CheppuInsertion
 import CheppuKeyboard
+import CheppuSettings
 
 /// Renders the core's `MenuBarMenu` as a status item, performs the action behind
 /// whichever item the user picks, wires a Dictation to the machine it runs on,
@@ -34,11 +35,22 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Accessibility hangs off this.
     private var canSeeTheHotkey = false
 
-    /// The switch in front of the Cues, which the menu both shows and moves.
+    /// Everything the user has set, and the window they set it in.
     ///
-    /// Read from here rather than remembered, so that the menu cannot come to
-    /// disagree with what a Dictation actually does.
-    private let cues = SystemCueSwitch()
+    /// One `Preferences` for the whole app rather than one per reader: the menu
+    /// shows the Cue switch, the Settings window moves it, and a Dictation
+    /// reads it and the three Cleanup switches on its way past. All of them are
+    /// reading the same preferences domain, so none of them can come to
+    /// disagree with what a Dictation actually does (ADR-0010).
+    private let preferences = Preferences()
+    private lazy var settingsWindow = SettingsWindow(
+        setting: preferences,
+        asking: SystemPermissions(),
+        clearingHistory: { [weak self] in self?.emptyHistory() },
+        // The Cue switch is in two places at once. Redrawing the menu is what
+        // keeps the tick in it saying what the window just did.
+        whenTheCuesMove: { [weak self] in self?.showMenu() }
+    )
 
     /// How long to leave between asking macOS again whether Cheppu may watch
     /// the keyboard. Accessibility is granted by hand in System Settings and
@@ -70,16 +82,17 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let engine: any EnginePort = parakeet ?? EngineWithNowhereToLive()
 
         let dictations = DictationCore(
-            // Every Cleanup rule on, which is what a Dictation does until the
-            // Settings window (#15) gives the user the three switches.
-            cleaningWith: .all,
+            // Read at each Dictation rather than handed over once: a rule
+            // turned off in Settings is off for the next thing the user says,
+            // with nothing restarted and nothing told (ADR-0010).
+            cleaningWith: preferences,
             hotkey: HotkeyWatch(),
             audio: MicrophoneCapture(),
             engine: engine,
             insertion: PasteInsertion(),
             clipboard: SystemClipboard(),
             history: history,
-            feedback: PillAndCues(),
+            feedback: PillAndCues(when: preferences),
             clock: SystemClock()
         )
         self.dictations = dictations
@@ -135,7 +148,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func showMenu() {
         statusItem?.menu = menu(
-            for: MenuBarMenu(canSeeTheHotkey: canSeeTheHotkey, areCuesOn: cues.areCuesOn())
+            for: MenuBarMenu(
+                canSeeTheHotkey: canSeeTheHotkey, areCuesOn: preferences.areCuesOn())
         )
     }
 
@@ -155,6 +169,20 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return menu
     }
 
+    /// Empties History, from the button in the Settings window.
+    ///
+    /// The store is the same one a Dictation writes to and the same one the
+    /// History window reads, so what the user asked to be forgotten is
+    /// forgotten everywhere at once.
+    private func emptyHistory() {
+        Task {
+            try? await history.clear()
+            // The History window, if the user has it open behind Settings, is
+            // still listing what they have just asked Cheppu to forget.
+            historyWindow.redrawIfShowing()
+        }
+    }
+
     @objc private func menuBarItemPicked(_ sender: NSMenuItem) {
         guard let item = sender.representedObject as? MenuBarItem else { return }
         switch item {
@@ -162,9 +190,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             AccessibilityRequest.ask()
         case .history:
             historyWindow.show()
+        case .settings:
+            settingsWindow.show()
         case .cues(let areOn):
-            cues.turnCues(on: !areOn)
+            preferences.turnCues(on: !areOn)
             showMenu()
+            // The same switch is a line in the Settings window, which may be
+            // open behind the menu.
+            settingsWindow.redrawIfShowing()
         case .quit:
             NSApp.terminate(nil)
         }

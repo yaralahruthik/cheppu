@@ -17,9 +17,17 @@ public enum MenuBarItem: Equatable, Sendable {
     /// (`docs/product-experience.md` §4).
     case history
 
+    /// Opens Settings, where everything Cheppu can be set to is on one screen.
+    ///
+    /// Near the bottom, next to Quit, because it is the item a user reaches for
+    /// twice: once when they install Cheppu, and once when something about it
+    /// is not the way they want it. History and the Cues are above it because
+    /// they are what the menu is opened for the rest of the time.
+    case settings
+
     /// Turns the Cues on or off, and says which way they are.
     ///
-    /// In the menu rather than only in Settings (#15) because of when it is
+    /// In the menu as well as in Settings because of when it is
     /// used: someone sits down in a meeting, and has two seconds and one hand
     /// to stop their laptop chirping twice a sentence. A switch that needed a
     /// window opened would be one they used once and then left off.
@@ -35,6 +43,7 @@ public enum MenuBarItem: Equatable, Sendable {
         // The ellipsis is what says it opens a window rather than doing
         // something the moment it is let go of.
         case .history: "History…"
+        case .settings: "Settings…"
         // "Sounds" rather than "Cues": the glossary is what the code calls
         // them, and this line is read by someone who has never seen it.
         case .cues: "Play Sounds"
@@ -49,6 +58,11 @@ public enum MenuBarItem: Equatable, Sendable {
         case .allowAccessibility: nil
         case .history: nil
         case .cues: nil
+        // The comma, as everywhere else on the machine. It reaches Cheppu only
+        // while the menu is open — an app with no windows has no menu bar of
+        // its own to press it in — which is exactly where the user is when they
+        // want it.
+        case .settings: ","
         case .quit: "q"
         }
     }
@@ -58,16 +72,16 @@ public enum MenuBarItem: Equatable, Sendable {
     public var isTicked: Bool {
         switch self {
         case .cues(let areOn): areOn
-        case .allowAccessibility, .history, .quit: false
+        case .allowAccessibility, .history, .settings, .quit: false
         }
     }
 }
 
 /// The menu behind Cheppu's menu bar icon.
 ///
-/// It offers History, the Cue switch and Quit, and — while Cheppu cannot see
-/// the Hotkey — says so at the top. Settings and Onboarding join it as their
-/// own tickets land.
+/// It offers History, the Cue switch, Settings and Quit, and — while Cheppu
+/// cannot see the Hotkey — says so at the top. Onboarding joins it when its own
+/// ticket lands.
 public struct MenuBarMenu: Equatable, Sendable {
     public let items: [MenuBarItem]
 
@@ -81,6 +95,6 @@ public struct MenuBarMenu: Equatable, Sendable {
     public init(canSeeTheHotkey: Bool, areCuesOn: Bool) {
         self.items =
             (canSeeTheHotkey ? [] : [.allowAccessibility])
-            + [.history, .cues(areOn: areCuesOn), .quit]
+            + [.history, .cues(areOn: areCuesOn), .settings, .quit]
     }
 }

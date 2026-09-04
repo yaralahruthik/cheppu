@@ -17,10 +17,15 @@ public struct PillAndCues: FeedbackPort {
     private let cues: Cues
 
     /// The real Pill, over the Mac's own screen and speakers.
+    ///
+    /// - Parameter cueSwitch: whether the user wants to hear a Dictation. Handed
+    ///   in rather than read from here, because where the switch is kept is the
+    ///   preferences' business and this target's business is the sound
+    ///   (ADR-0010).
     @MainActor
-    public init() {
+    public init(when cueSwitch: any CueSwitch) {
         self.pill = Pill()
-        self.cues = Cues(through: SystemSpeaker(), when: SystemCueSwitch())
+        self.cues = Cues(through: SystemSpeaker(), when: cueSwitch)
     }
 
     public func showPill(_ state: PillState) async {

@@ -108,6 +108,10 @@ _Avoid_: toast, alert, banner, message
 The list of recent Final Texts kept on the machine so a Dictation is never lost. Written before Insertion is attempted, so a Dictation whose Insertion failed is in it too. Holds Final Text and a timestamp only — never audio, never the Raw Transcript, and never which app the words went into — keeps the hundred most recent and drops the rest, and is emptied in one action (ADR-0009).
 _Avoid_: log, transcripts, recordings
 
+**Settings**:
+The one window everything the user can set is on: the three Cleanup switches, the Cues, launch at login, what macOS says about each permission, and the one action that empties History. The Hotkey belongs on it too, and is the one line of it not built yet. One screen, no tabs, and nothing to scroll for. Every switch takes effect where it is flicked rather than on the way out, because there is no way out — the window has no OK and no Cancel. What it moves is kept in the standard user defaults domain and read where it is used, never held (ADR-0010); there is no configuration file anybody is expected to find.
+_Avoid_: preferences, options, config, panel
+
 **Onboarding**:
 The first-run sequence: permissions, Engine download, and one successful Dictation in a field the app controls.
 _Avoid_: setup wizard, welcome flow

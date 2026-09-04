@@ -81,12 +81,23 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // Settings: everything the user can set, and the one window they set it
+        // in. A target of its own rather than part of the app so that what a
+        // fresh install does before anybody has opened the window — every
+        // Cleanup rule on, the Cues audible — and what survives a relaunch are
+        // testable against a real preferences domain, without the user's own
+        // defaults being written to and with no window ever opened.
+        .target(
+            name: "CheppuSettings",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The OS-facing shell: the menu bar app that renders what the core decides.
         .executableTarget(
             name: "Cheppu",
             dependencies: [
                 "CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard", "CheppuInsertion",
-                "CheppuFeedback", "CheppuHistory",
+                "CheppuFeedback", "CheppuHistory", "CheppuSettings",
             ]
         ),
 
@@ -123,6 +134,11 @@ let package = Package(
         .testTarget(
             name: "CheppuFeedbackTests",
             dependencies: ["CheppuFeedback"]
+        ),
+
+        .testTarget(
+            name: "CheppuSettingsTests",
+            dependencies: ["CheppuSettings"]
         ),
     ],
     swiftLanguageModes: [.v6]

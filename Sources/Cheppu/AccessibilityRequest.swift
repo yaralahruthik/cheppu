@@ -1,4 +1,6 @@
 import AppKit
+import CheppuCore
+import CheppuSettings
 
 /// Asking for Accessibility access.
 ///
@@ -12,11 +14,6 @@ import AppKit
 /// This is glue: it holds no decisions of its own, which is why it is not tested.
 @MainActor
 enum AccessibilityRequest {
-    /// The pane the switch is on. The `x-apple.systempreferences` scheme opens
-    /// System Settings at exactly this pane rather than at its front door.
-    private static let accessibilityPane =
-        "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-
     /// Says why Cheppu needs Accessibility, and opens the pane if the user
     /// wants to grant it now.
     static func ask() {
@@ -34,7 +31,9 @@ enum AccessibilityRequest {
         NSApp.activate()
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        guard let pane = URL(string: accessibilityPane) else { return }
-        NSWorkspace.shared.open(pane)
+        // The same pane the Settings window's button opens, from the same
+        // place: an app that knew two ways to the one switch would eventually
+        // know one of them wrongly.
+        SystemSettingsPane.open(.accessibility)
     }
 }
