@@ -1,0 +1,56 @@
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_893245a4643401::t_7e636bcc9f34fd 41
+  s_893245a4643401::t_f55fd7685ce03d 13,37-39,51
+.github/workflows/ci.yml
+  s_893245a4643401::t_e056f3714f56c3 45-47
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_893245a4643401::t_0ff03d4a0d34d6 162-169,193-195,197,327-330,341-343
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_893245a4643401::t_d4be792ba1fe90 60-61,72,181-184,186-188,193-206,208-216
+  s_893245a4643401::t_88b62c4071a79f 189-192
+  s_893245a4643401::t_3159d8e58d5eb5 26,28-29,173,175,261,280,324,352,367,386,396,415,417,468,470,556,573,590,604,620,624,674,758,778,784,795
+  s_893245a4643401::t_27e6e904102e8a 185,207
+  s_893245a4643401::t_00675589bc6bec 217
+Sources/Cheppu/MenuBarController.swift
+  s_893245a4643401::t_406c41211afa48 65-67
+Tests/CheppuCoreTests/CleanupTests.swift
+  s_893245a4643401::t_27e6e904102e8a 345
+  s_893245a4643401::t_0c6782dc1b3905 14-28,200-289,291-293,295-311
+  s_893245a4643401::t_7c564f303385aa 35-199
+  s_893245a4643401::t_8d4573bf49e18b 33-34,312-313
+  s_893245a4643401::t_b05691ee7b35b1 1-13,29-32,348-350,352-371
+  s_893245a4643401::t_88b62c4071a79f 290,294,351
+  s_893245a4643401::t_39399c6b811fac 314-344,346-347
+Sources/CheppuCore/Cleanup/Cleanup.swift
+  s_893245a4643401::t_7e636bcc9f34fd 280-281
+  s_893245a4643401::t_6e5f9631a43209 1-279,282-311
+Scripts/check-cleanup-is-a-pure-function.sh
+  s_893245a4643401::t_c1c4c7f1f4d3c2 1-9,15-17,23-26,28,35-42,44-50
+  s_893245a4643401::t_8bad8595a4504c 10-14,18-22,27,29-34,43
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_893245a4643401::t_88b62c4071a79f 526
+  s_893245a4643401::t_3159d8e58d5eb5 27,29-30,286-287,352-353,464,479-480,497,546,555-556
+  s_893245a4643401::t_27e6e904102e8a 507-508,520
+  s_893245a4643401::t_bc3f9f28e87beb 503-506,509-519,521-525,527-538
+CONTEXT.md
+  s_893245a4643401::t_1c772020e4d0ca 49-50,52
+  s_893245a4643401::t_3efecd78b090d3 51
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_893245a4643401::t_219ed6b8051ea4 101-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "0f574e0e9f6052a141f0ed45c0ac1ba5b0b65007",
+  "prompts": {},
+  "sessions": {
+    "s_893245a4643401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c7ab6ec-f57b-4afd-baa5-17890a8add2d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
