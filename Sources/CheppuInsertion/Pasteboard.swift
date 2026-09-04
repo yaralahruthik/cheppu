@@ -88,20 +88,14 @@ struct SystemPasteboard: Pasteboard {
 ///
 /// Text only, because the one thing Cheppu ever puts on the clipboard
 /// deliberately is a Final Text — the Clipboard Fallback, when the words could
-/// not be inserted (#14). Reading and restoring in full is Insertion's, above.
-///
-/// It is here now, doing nothing, because a `DictationCore` is handed all of
-/// its ports at once and the alternative was a stand-in that quietly threw the
-/// user's clipboard away the first time #14 called it.
+/// not be inserted. Reading and restoring in full is Insertion's, above, and
+/// nothing here gives anything back: what this leaves is what the user is going
+/// to paste.
 public struct SystemClipboard: ClipboardPort {
     public init() {}
 
-    public func read() async -> String? {
-        NSPasteboard.general.string(forType: .string)
-    }
-
-    public func write(_ text: String) async {
+    public func leave(_ finalText: FinalText) async {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        NSPasteboard.general.setString(finalText.text, forType: .string)
     }
 }

@@ -157,7 +157,8 @@ public struct InputLevel: Equatable, Sendable {
 /// What the Pill is showing.
 ///
 /// The two states the user has to be able to tell apart without looking
-/// carefully: it is hearing me, and it is working on what it heard.
+/// carefully — it is hearing me, and it is working on what it heard — and the
+/// one thing it ever has to say in words.
 ///
 /// Listening carries the level rather than sitting next to it. A Pill that says
 /// "listening" and nothing else answers the wrong question — the user wants to
@@ -166,6 +167,15 @@ public struct InputLevel: Equatable, Sendable {
 public enum PillState: Equatable, Sendable {
     case listening(InputLevel)
     case transcribing
+
+    /// The Clipboard Fallback: the words could not be typed, so they are on the
+    /// clipboard and the user is the one who puts them where they were going.
+    ///
+    /// The only state the Pill has to say rather than draw. "Done" is signalled
+    /// by the text appearing (`docs/product-experience.md` §3), and this is the
+    /// state where it did not: a shape the user had to learn would be a
+    /// Dictation that looked like it had worked.
+    case onTheClipboard
 }
 
 /// A short sound marking the edge of a Dictation, so one can be run by feel.

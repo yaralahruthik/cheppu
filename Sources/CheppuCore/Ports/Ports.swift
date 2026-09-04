@@ -138,15 +138,28 @@ public protocol InsertionPort: Sendable {
     /// working. The check belongs next to the keystroke rather than up here,
     /// where anything between the two would be a window for focus to move in.
     ///
-    /// Throwing means it did not land, and the Clipboard Fallback ticket
-    /// decides what the user is told about that.
+    /// Throwing means it did not land, whatever the reason, and the Clipboard
+    /// Fallback is what the user gets instead: the words on the clipboard, and
+    /// the Pill saying so. An error this port has no name for is answered the
+    /// same way as one it does, because there is no failure of an Insertion
+    /// that leaves the user needing something else.
     func insert(_ finalText: FinalText, into targetApp: TargetApp) async throws
 }
 
-/// The pasteboard, which Cheppu borrows and gives back.
+/// The clipboard, as somewhere to leave what could not be typed.
+///
+/// One direction only. Borrowing the pasteboard to paste with, and giving it
+/// back, belongs to whoever performs the Insertion and never leaves that file;
+/// what the core decides is the one thing Cheppu ever leaves on the user's
+/// clipboard on purpose.
 public protocol ClipboardPort: Sendable {
-    func read() async -> String?
-    func write(_ text: String) async
+    /// Leaves the Final Text on the clipboard, replacing whatever was there.
+    ///
+    /// Called only on the Clipboard Fallback, and never followed by putting
+    /// back what it displaced: the words the user could not have typed for them
+    /// are worth more than the thing they had copied, and this is the one place
+    /// Cheppu makes that trade (`docs/product-experience.md` §4).
+    func leave(_ finalText: FinalText) async
 }
 
 /// The local store that makes sure nothing said is ever lost.
@@ -175,16 +188,19 @@ public protocol ClockPort: Sendable {
     /// Waits out a span and then does what it was given to do, unless the wait
     /// is called off before it ends.
     ///
-    /// The waiting belongs here rather than to the core. Cheppu waits for
-    /// exactly one thing — the Cap — and a core that ran its own timer would be
-    /// a core whose five minutes could only be reached by waiting five minutes.
+    /// The waiting belongs here rather than to the core. Cheppu waits for two
+    /// things — the Cap, and the notice a Clipboard Fallback leaves on screen —
+    /// and a core that ran its own timer would be a core whose five minutes
+    /// could only be reached by waiting five minutes.
     ///
     /// It returns once the wait has begun rather than when it ends, because
     /// arming the Cap happens on the way into a Dictation and must cost it
     /// nothing.
     ///
     /// One wait at a time: starting another calls off the one before it, so a
-    /// Clock can never be counting for two Dictations at once.
+    /// Clock can never be counting for two Dictations at once. That is what
+    /// makes a Dictation started while a notice is still up take the Pill over
+    /// rather than have it pulled out from under it.
     func waitOut(_ span: Duration, then whatFollows: @escaping @Sendable () async -> Void) async
 
     /// Calls off the wait that is under way, if there is one, so that what

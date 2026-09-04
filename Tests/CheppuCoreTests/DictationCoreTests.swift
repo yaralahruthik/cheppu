@@ -47,6 +47,7 @@ struct DictationCoreTests {
         let clock: FakeClock
         let hotkey: FakeHotkey
         let focus: FakeFocus
+        let clipboard: FakeClipboard
         let core: DictationCore
 
         init(
@@ -56,6 +57,7 @@ struct DictationCoreTests {
             now: Date = DictationCoreTests.aTuesdayAfternoon,
             typingIn app: TargetApp? = DictationCoreTests.mail,
             insertion: FakeInsertion.Outcome = .lands,
+            hadCopied: String? = nil,
             historyRefuses: Bool = false,
             isAccessibilityGranted: Bool = true,
             cleaningWith rules: CleanupRules = .all
@@ -64,21 +66,29 @@ struct DictationCoreTests {
             let clock = FakeClock(reading: now)
             let hotkey = FakeHotkey(isAccessibilityGranted: isAccessibilityGranted)
             let focus = FakeFocus(on: app)
+            let clipboard = FakeClipboard(journal: journal, holding: hadCopied)
             self.journal = journal
             self.clock = clock
             self.hotkey = hotkey
             self.focus = focus
+            self.clipboard = clipboard
             self.core = DictationCore(
                 cleaningWith: rules,
                 hotkey: hotkey,
                 audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
                 insertion: FakeInsertion(journal: journal, focus: focus, outcome: insertion),
-                clipboard: FakeClipboard(),
+                clipboard: clipboard,
                 history: FakeHistory(journal: journal, refuses: historyRefuses),
                 feedback: FakeFeedback(journal: journal),
                 clock: clock
             )
+        }
+
+        /// The user reads the notice the Pill is showing, which takes as long
+        /// as the core decided it should stay up.
+        func readTheNotice() async {
+            await clock.advance(by: DictationMachine.longEnoughToReadTheNotice)
         }
 
         /// Every Final Text the Dictation put somewhere, as the user would read
@@ -557,9 +567,11 @@ struct DictationCoreTests {
     func aDictationWhoseInsertionFailsStillEnds() async throws {
         let scenario = Scenario(insertion: .refuses)
 
-        await #expect(throws: FakeInsertion.Refused.self) {
-            try await scenario.toggleADictation()
-        }
+        // An Insertion that did not land is not an error the Dictation ends on:
+        // it is answered, here, with the words on the clipboard and the Pill
+        // saying so.
+        try await scenario.toggleADictation()
+        await scenario.readTheNotice()
 
         #expect(await scenario.journal.calls.last == .pillHidden)
 
@@ -568,19 +580,32 @@ struct DictationCoreTests {
         #expect(timesCaptureOpened == 2)
     }
 
-    @Test("A Dictation that fails on its last step still takes the Pill down")
-    func aDictationThatFailsOnItsLastStepStillTakesThePillDown() async throws {
-        // Nothing had focus, so this Dictation ends at History — and History
-        // will not take it. The machine has already returned to Idle by the
-        // time that happens, which is the one moment a failure could leave a
-        // Pill on screen with nothing left running to take it away.
-        let scenario = Scenario(typingIn: nil, historyRefuses: true)
+    @Test("A History that will not take the words does not take the Dictation with it")
+    func aHistoryThatWillNotTakeTheWordsDoesNotTakeTheDictationWithIt() async throws {
+        // A full disk, or a store that cannot be opened. History is written
+        // first because it is the last resort and not because it is the point,
+        // so a store that refuses must not also cost the user the Insertion —
+        // which is where the words were actually going (ADR-0009).
+        let scenario = Scenario(historyRefuses: true)
 
-        await #expect(throws: FakeHistory.Refused.self) {
-            try await scenario.toggleADictation()
-        }
+        try await scenario.toggleADictation()
 
+        #expect(await scenario.insertedText == ["Hello there."])
         #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("Words a broken History could not keep are still left where the user can reach them")
+    func wordsABrokenHistoryCouldNotKeepAreStillLeftWhereTheUserCanReachThem() async throws {
+        // Both of the places a Dictation is kept have gone at once: the store
+        // will not take the words and the Insertion will not land them. The
+        // clipboard is what is left, and it is enough — the words are lost only
+        // where all three have gone wrong together.
+        let scenario = Scenario(insertion: .refuses, historyRefuses: true)
+
+        try await scenario.toggleADictation()
+
+        #expect(await scenario.clipboard.contents == "Hello there.")
+        #expect(await scenario.journal.calls.last == .pillShown(.onTheClipboard))
     }
 
     @Test("What the microphone is hearing is what the Pill is told to show")
@@ -643,18 +668,17 @@ struct DictationCoreTests {
     func aDictationWhoseTargetAppLostFocusKeepsTheWords() async throws {
         let scenario = Scenario(insertion: .findsTheFocusMoved)
 
-        await #expect(throws: InsertionFailure.focusMoved) {
-            try await scenario.toggleADictation()
-        }
+        try await scenario.toggleADictation()
 
         #expect(await scenario.insertedText.isEmpty)
         // The words are still the user's: History was written before the
-        // Insertion was tried, and the Dictation ended rather than hanging.
+        // Insertion was tried, and they are on the clipboard for the user to
+        // put where they meant them to go.
         #expect(
             await scenario.journal.calls.contains(
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("Hello there."), recordedAt: Self.aTuesdayAfternoon))))
-        #expect(await scenario.journal.calls.last == .pillHidden)
+        #expect(await scenario.clipboard.contents == "Hello there.")
     }
 
     @Test("A Dictation with no app to insert into still keeps the words")
@@ -668,6 +692,9 @@ struct DictationCoreTests {
             await scenario.journal.calls.contains(
                 .appendedToHistory(
                     HistoryEntry(finalText: FinalText("Hello there."), recordedAt: Self.aTuesdayAfternoon))))
+        #expect(await scenario.clipboard.contents == "Hello there.")
+
+        await scenario.readTheNotice()
         #expect(await scenario.journal.calls.last == .pillHidden)
 
         // And the Dictation ended, so the next tap of the Hotkey starts one
@@ -869,5 +896,146 @@ struct DictationCoreTests {
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
         #expect(await scenario.journal.calls.last == .pillShown(.listening(.silent)))
+    }
+
+    // MARK: - Clipboard Fallback
+
+    @Test("An Insertion that did not land leaves the words on the clipboard and says so")
+    func anInsertionThatDidNotLandLeavesTheWordsOnTheClipboard() async throws {
+        let scenario = Scenario(insertion: .refuses)
+
+        try await scenario.toggleADictation()
+
+        // The whole of a Dictation that could not be typed. Nothing is lost —
+        // History was written before the Insertion was tried — and nothing is
+        // silent: the words go where the user can paste them, and the Pill says
+        // so rather than disappearing on a Dictation that went nowhere.
+        #expect(
+            await scenario.callsIgnoringTimestamps == Self.openingADictation + [
+                .capturingStopped,
+                .cuePlayed(.dictationStopped),
+                .pillShown(.transcribing),
+                .transcribed(Self.spokenAudio),
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("Hello there."), recordedAt: Self.aTuesdayAfternoon)
+                ),
+                .leftOnTheClipboard(FinalText("Hello there.")),
+                .pillShown(.onTheClipboard),
+            ])
+
+        await scenario.readTheNotice()
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test(
+        "However an Insertion fails, the words end up on the clipboard and in History",
+        arguments: [
+            FakeInsertion.Outcome.refuses,
+            .findsTheFocusMoved,
+            .findsAccessibilityTakenAway,
+        ]
+    )
+    func howeverAnInsertionFailsTheWordsEndUpOnTheClipboard(
+        _ outcome: FakeInsertion.Outcome
+    ) async throws {
+        let scenario = Scenario(insertion: outcome)
+
+        try await scenario.toggleADictation()
+
+        // The three ways an Insertion does not land: the Target App would not
+        // take it, the user moved on while the Engine worked, and the
+        // Accessibility that types the paste was taken away mid-session. The
+        // user is told the same thing about all three, because the same thing
+        // is true of all three — the words are on the clipboard.
+        #expect(await scenario.insertedText.isEmpty)
+        #expect(await scenario.clipboard.contents == "Hello there.")
+        #expect(
+            await scenario.journal.calls.contains(
+                .appendedToHistory(
+                    HistoryEntry(finalText: FinalText("Hello there."), recordedAt: Self.aTuesdayAfternoon))))
+        #expect(await scenario.journal.calls.contains(.pillShown(.onTheClipboard)))
+    }
+
+    @Test("The clipboard the user had is deliberately not given back")
+    func theClipboardTheUserHadIsDeliberatelyNotGivenBack() async throws {
+        let scenario = Scenario(insertion: .refuses, hadCopied: "https://example.com")
+
+        try await scenario.toggleADictation()
+
+        // The one place Cheppu keeps something of the user's rather than
+        // putting it back. What they had copied is gone and what they said is
+        // there instead, because a fallback that gave the clipboard back would
+        // be a Dictation that vanished.
+        #expect(await scenario.clipboard.contents == "Hello there.")
+    }
+
+    @Test("A Dictation that landed leaves the clipboard exactly as the user had it")
+    func aDictationThatLandedLeavesTheClipboardAsTheUserHadIt() async throws {
+        let scenario = Scenario(hadCopied: "https://example.com")
+
+        try await scenario.toggleADictation()
+
+        // The Insertion borrows the pasteboard and gives it back — that is
+        // `PasteInsertion`'s, and it is tested there. What is asserted here is
+        // that nothing else touches it: the Clipboard Fallback is the only
+        // thing in Cheppu that leaves something on the user's clipboard.
+        #expect(await scenario.clipboard.contents == "https://example.com")
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("The notice stays up until the user has had time to read it")
+    func theNoticeStaysUpUntilTheUserHasHadTimeToReadIt() async throws {
+        let scenario = Scenario(insertion: .refuses)
+
+        try await scenario.toggleADictation()
+
+        // The Pill is the whole of what says where the words went, so it
+        // cannot come down in the same breath as it goes up.
+        #expect(await scenario.journal.calls.last == .pillShown(.onTheClipboard))
+
+        await scenario.readTheNotice()
+
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("The next Dictation takes the notice over, and never has its Pill taken away")
+    func theNextDictationTakesTheNoticeOver() async throws {
+        let scenario = Scenario(insertion: .refuses)
+
+        try await scenario.toggleADictation()
+        // The user reads the notice, presses the Hotkey and starts speaking
+        // again — all inside the time the notice would have come down in.
+        try await scenario.tapThroughTheCore()
+        await scenario.readTheNotice()
+
+        // The Pill on screen belongs to the Dictation that is listening now,
+        // and the notice the Dictation before it left is not what takes it
+        // down.
+        #expect(await scenario.journal.calls.last == .pillShown(.listening(.silent)))
+    }
+
+    @Test("The words left to paste are the words that were safe to type there")
+    func theWordsLeftToPasteAreTheWordsThatWereSafeToTypeThere() async throws {
+        let scenario = Scenario(
+            hears: ARawTranscript.saidWithAPause,
+            typingIn: ATargetApp.terminal,
+            insertion: .refuses
+        )
+
+        try await scenario.toggleADictation()
+
+        // What could not be typed is what is left to paste, and the user's next
+        // keystroke pastes it into the same Terminal the Insertion was for. So
+        // the Paragraph Break stays flattened — a newline there is Return
+        // however it arrives (#12) — while History keeps what was said.
+        #expect(await scenario.clipboard.contents == "That is one thought. The next one")
+        #expect(
+            await scenario.journal.calls.contains(
+                .appendedToHistory(
+                    HistoryEntry(
+                        finalText: FinalText("That is one thought.\nThe next one"),
+                        recordedAt: Self.aTuesdayAfternoon
+                    )
+                )))
     }
 }

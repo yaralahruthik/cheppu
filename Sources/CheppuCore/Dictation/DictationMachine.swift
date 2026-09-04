@@ -93,11 +93,36 @@ public enum DictationEvent: Equatable, Sendable {
     case rawTranscriptReceived(RawTranscript)
     case insertionSucceeded
 
+    /// The Final Text did not land: the Target App would not take it, the user
+    /// moved on while the Engine was working, or the Accessibility that types
+    /// the paste was taken away mid-session.
+    ///
+    /// One event for all of them, because the answer to all of them is the
+    /// same: the words go on the clipboard and the Pill says so. Why it did not
+    /// land changes nothing the user can act on — what they do next is paste —
+    /// and a Dictation that read differently depending on which refusal it met
+    /// would be three failures to learn instead of one.
+    ///
+    /// It is not a `dictationFailed`. The Dictation ends with what was said
+    /// somewhere the user can get it, which is the whole of what
+    /// `docs/product-experience.md` §4 asks of it.
+    case insertionFailed
+
+    /// The notice has been up long enough to have been read.
+    ///
+    /// The Clock says so, on the way out of a Clipboard Fallback, because the
+    /// Pill saying where the words went is the one thing on screen that is
+    /// read rather than glanced at.
+    case noticeRead
+
     /// A port could not do what it was asked.
     ///
-    /// Which port, and what the user is told about it, is the Clipboard Fallback
-    /// ticket's. All this event settles is that a Dictation always has a way
-    /// back to Idle, so a failure costs the user one Dictation and not the app.
+    /// Which port is not in here, and neither is what the user is told: this is
+    /// every failure that is not an Insertion, and there is nothing useful to
+    /// say about a microphone that would not open or an Engine that would not
+    /// answer beyond ending the Dictation. All this event settles is that a
+    /// Dictation always has a way back to Idle, so a failure costs the user one
+    /// Dictation and not the app.
     case dictationFailed
 }
 
@@ -131,6 +156,22 @@ public enum DictationEffect: Equatable, Sendable {
     case hidePill
     case recordInHistory(FinalText)
     case insert(FinalText, into: TargetApp)
+
+    /// Leave the words on the clipboard, for the user to paste where Cheppu
+    /// could not type them.
+    ///
+    /// The one thing Cheppu ever puts on the user's clipboard and does not take
+    /// back off it. What they had copied is gone, which is the deliberate cost
+    /// of a Dictation that would otherwise be nowhere they could reach.
+    case leaveOnTheClipboard(FinalText)
+
+    /// Keep the notice on screen for as long as it takes to read, and then take
+    /// the Pill down.
+    ///
+    /// The waiting belongs to the Clock, exactly as the Cap's does: nothing in
+    /// Cheppu holds a timer of its own, and a suite that had to wait out the
+    /// notice would be a suite that waited.
+    case leaveTheNoticeUp
 }
 
 /// The lifecycle of a Dictation, and the whole of Cheppu's decision-making.
@@ -158,6 +199,15 @@ public struct DictationMachine: Sendable {
     /// dictating a paragraph ever meets it: five minutes is a Dictation that
     /// has been left running rather than one being spoken into.
     public static let cap: Duration = .seconds(5 * 60)
+
+    /// How long the Clipboard Fallback's notice stays on screen.
+    ///
+    /// Long enough to be read out of the corner of an eye that was on the work
+    /// and did not expect to be interrupted, and short enough that the Pill is
+    /// gone before the user's next Dictation. It says where the words are; the
+    /// words themselves stay on the clipboard, and in History, long after it
+    /// has gone.
+    public static let longEnoughToReadTheNotice: Duration = .seconds(5)
 
     /// The Cleanup this Dictation's words go through on their way to the
     /// Target App.
@@ -190,6 +240,17 @@ public struct DictationMachine: Sendable {
     /// may be somewhere else and the answer would be the wrong app.
     private var targetApp: TargetApp?
 
+    /// The words this Dictation handed to the Insertion, while it is being
+    /// carried out.
+    ///
+    /// Kept because what could not be typed is what is left to paste: the
+    /// Clipboard Fallback leaves exactly the text the Target App was offered,
+    /// trimmed and — where that app is a Terminal — with its Paragraph Breaks
+    /// already flattened (#12). The user's next keystroke pastes it into the
+    /// same window the Insertion was for, so a newline that was not safe to
+    /// type there is not safe to leave there either.
+    private var handedToInsertion: FinalText?
+
     /// - Parameter rules: which Cleanup rules a Dictation's words go through.
     ///   Every rule on unless the user has turned one off.
     public init(cleaningWith rules: CleanupRules = .all) {
@@ -210,8 +271,9 @@ public struct DictationMachine: Sendable {
             thisPressOpenedTheDictation = true
             // Nothing carried over from the Dictation before this one: the app
             // that received the last Insertion must never receive this one by
-            // default.
+            // default, and neither must its words.
             targetApp = nil
+            handedToInsertion = nil
             // Capture opens before the Cue plays: the sound is feedback, but a
             // word spoken before the microphone is open is gone. The Cap starts
             // with the microphone, so that its five minutes are five minutes of
@@ -348,12 +410,12 @@ public struct DictationMachine: Sendable {
 
             // Nothing had focus when the Dictation stopped, so there is nowhere
             // for the words to be typed. They are still the user's — History is
-            // written all the same — and the Dictation ends rather than waiting
-            // for an Insertion that cannot come. Saying so out loud, and
-            // leaving the text on the clipboard, is #14's.
+            // written all the same — and rather than waiting for an Insertion
+            // that cannot come, the Dictation ends the way every Insertion that
+            // does not land ends: on the clipboard, and said out loud.
             guard let targetApp else {
-                state = .idle
-                return [.recordInHistory(finalText), .hidePill]
+                return [.recordInHistory(finalText)]
+                    + leaveOnTheClipboard(finalText.normalisedForInsertion)
             }
 
             state = .inserting
@@ -363,16 +425,46 @@ public struct DictationMachine: Sendable {
             // History is given the Final Text and the Target App a version of it
             // shaped for where it is going — trimmed, and with its Paragraph
             // Breaks flattened where that is a Terminal (#12). What is kept is
-            // what was said; what is typed is what is safe to type there.
-            return [
-                .recordInHistory(finalText),
-                .insert(finalText.normalisedForInsertion(into: targetApp), into: targetApp),
-            ]
+            // what was said; what is typed is what is safe to type there — and,
+            // where it cannot be typed at all, what is left to paste.
+            let asItWouldBeTyped = finalText.normalisedForInsertion(into: targetApp)
+            handedToInsertion = asItWouldBeTyped
+            return [.recordInHistory(finalText), .insert(asItWouldBeTyped, into: targetApp)]
 
         case (.inserting, .insertionSucceeded):
             state = .idle
+            handedToInsertion = nil
             // The text appearing is the signal that it worked, so the Pill's
             // last job is to get out of the way.
+            return [.hidePill]
+
+        case (.inserting, .insertionFailed):
+            // The Clipboard Fallback. The words could not be typed — the app
+            // refused them, the user moved on, or the grant that types the
+            // paste was taken away — so they are left where the user can put
+            // them where they were going themselves.
+            //
+            // The words are already in History, written before the Insertion
+            // was tried, so this is where they can be reached rather than the
+            // only place they exist.
+            guard let handedToInsertion else {
+                // Unreachable: nothing enters Inserting without handing the
+                // Insertion its words. Ending the Dictation is still better
+                // than leaving a Pill up over a state that cannot happen.
+                state = .idle
+                return [.hidePill]
+            }
+            return leaveOnTheClipboard(handedToInsertion)
+
+        case (.idle, .noticeRead):
+            // The notice has been up long enough. The Pill's last job, as
+            // always, is to get out of the way.
+            //
+            // Only from Idle. A Dictation started while the notice was up owns
+            // the Pill now, and the notice it replaced must not be what takes
+            // it down. The Clock cannot deliver this late in any case — the
+            // next Dictation's Cap calls the wait off as it starts — so this is
+            // belt as well as braces.
             return [.hidePill]
 
         case (.listening, .dictationFailed):
@@ -387,6 +479,7 @@ public struct DictationMachine: Sendable {
         case (.transcribing, .dictationFailed), (.inserting, .dictationFailed):
             state = .idle
             thisPressOpenedTheDictation = false
+            handedToInsertion = nil
             return [.hidePill]
 
         case (.idle, .dictationFailed):
@@ -407,17 +500,26 @@ public struct DictationMachine: Sendable {
         }
     }
 
-    /// Ends the Dictation that is Listening, whatever ended it: either
-    /// Activation, a press spoiled deep into a Hold, or the Cap.
+    /// Ends the Dictation with its words on the clipboard and the Pill saying
+    /// so: the Clipboard Fallback, whichever way the Insertion failed to happen.
     ///
-    /// Who has focus is read first and at once: it is the definition of the
-    /// Target App, and everything after this — closing the microphone, the Cue
-    /// — takes long enough for the user to have clicked into another window.
+    /// The clipboard is written before the notice goes up, so that a user who
+    /// reads it and pastes at once finds the words already there. The notice
+    /// then stays up rather than the Pill coming down, because "done" is
+    /// signalled by the text appearing (`docs/product-experience.md` §3) and
+    /// here it did not appear: a Pill that vanished would say the Dictation
+    /// worked.
     ///
-    /// The microphone closes before the stop Cue plays, so the Cue is not one of
-    /// the sounds the Engine is later asked to transcribe. The Pill says
-    /// "transcribing" before the Engine is asked, so the pause that follows is
-    /// never mistaken for a hang.
+    /// What was on the clipboard before is not put back. Everywhere else Cheppu
+    /// borrows the pasteboard and gives it back (§5); here it deliberately
+    /// keeps it, because the alternative is a Dictation the user cannot reach
+    /// from anywhere but History.
+    private mutating func leaveOnTheClipboard(_ finalText: FinalText) -> [DictationEffect] {
+        state = .idle
+        handedToInsertion = nil
+        return [.leaveOnTheClipboard(finalText), .showPill(.onTheClipboard), .leaveTheNoticeUp]
+    }
+
     /// Hands back the Dictation that is Listening without transcribing it.
     ///
     /// The other end of `stopListening()`, and the whole of what Cancel and a
@@ -436,6 +538,17 @@ public struct DictationMachine: Sendable {
         return [.stopCapturing, .stopTheCap]
     }
 
+    /// Ends the Dictation that is Listening, whatever ended it: either
+    /// Activation, a press spoiled deep into a Hold, or the Cap.
+    ///
+    /// Who has focus is read first and at once: it is the definition of the
+    /// Target App, and everything after this — closing the microphone, the Cue
+    /// — takes long enough for the user to have clicked into another window.
+    ///
+    /// The microphone closes before the stop Cue plays, so the Cue is not one of
+    /// the sounds the Engine is later asked to transcribe. The Pill says
+    /// "transcribing" before the Engine is asked, so the pause that follows is
+    /// never mistaken for a hang.
     private mutating func stopListening() -> [DictationEffect] {
         state = .transcribing
         // Whatever the Hotkey is doing from here belongs to a Dictation that

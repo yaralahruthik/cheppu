@@ -20,7 +20,7 @@ Everything runs on-device. There is no server, no telemetry, and no network acce
 3. Tap again, or release the key. Cheppu transcribes the audio on-device.
 4. The text is inserted at your cursor in the app you were using. Your clipboard is left as you had it.
 
-If Cheppu cannot insert into the focused app, the text is placed on your clipboard and the pill tells you so. Every dictation is also kept in History, so nothing you said is lost. A dictation with no speech in it disappears silently, and one left running stops itself after five minutes.
+If Cheppu cannot insert into the focused app — it refused the paste, you moved to another window while it was transcribing, or Accessibility was taken away — the text is placed on your clipboard and the pill says so. That is the one time your clipboard is not put back as you had it: what you said is there instead, for you to paste where you meant it to go. Every dictation is also kept in History, so nothing you said is lost. A dictation with no speech in it disappears silently, and one left running stops itself after five minutes.
 
 Press Escape while listening to cancel: the audio is thrown away and nothing is inserted or kept. Cheppu never takes the key from the app you are in — it can read your keystrokes and cannot swallow them, by construction ([ADR-0006](./docs/adr/0006-escape-cancels-a-dictation-without-taking-the-key.md)) — so Escape also does whatever it would have done where you are typing, and a sound of its own tells you the dictation is gone.
 
