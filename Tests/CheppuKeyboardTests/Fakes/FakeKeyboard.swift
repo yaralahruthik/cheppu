@@ -72,32 +72,32 @@ final class FakeAccessibilityAccess: AccessibilityAccess, @unchecked Sendable {
     var timesRead: Int { lock.withLock { readings } }
 }
 
-/// Every Activation the Hotkey reported, in the order it reported them.
-actor ReportedActivations {
-    private(set) var activations: [HotkeyEvent] = []
+/// Everything the Hotkey reported, in the order it reported it.
+actor ReportedGestures {
+    private(set) var gestures: [HotkeyEvent] = []
 
-    /// How many of them `nextActivation()` has handed back, and whoever is
-    /// waiting for one that has not arrived yet.
+    /// How many of them `nextGesture()` has handed back, and whoever is waiting
+    /// for one that has not arrived yet.
     private var delivered = 0
     private var waiting: CheckedContinuation<HotkeyEvent, Never>?
 
-    func record(_ activation: HotkeyEvent) {
-        activations.append(activation)
+    func record(_ gesture: HotkeyEvent) {
+        gestures.append(gesture)
         if let waiting {
             self.waiting = nil
             delivered += 1
-            waiting.resume(returning: activation)
+            waiting.resume(returning: gesture)
         }
     }
 
-    /// The next Activation reported, waiting for it if it has not arrived.
+    /// The next gesture reported, waiting for it if it has not arrived.
     ///
-    /// What lets a test assert on a tap without waiting a fixed length of time
-    /// for a keyboard that crosses into an actor on its own schedule.
-    func nextActivation() async -> HotkeyEvent {
-        if delivered < activations.count {
+    /// What lets a test assert on a press without waiting a fixed length of
+    /// time for a keyboard that crosses into an actor on its own schedule.
+    func nextGesture() async -> HotkeyEvent {
+        if delivered < gestures.count {
             defer { delivered += 1 }
-            return activations[delivered]
+            return gestures[delivered]
         }
         return await withCheckedContinuation { continuation in
             waiting = continuation

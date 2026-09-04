@@ -1,3 +1,5 @@
+import Foundation
+
 /// A Dictation, driven.
 ///
 /// The core owns a `DictationMachine` and the ports, and is the only place the
@@ -25,6 +27,13 @@ public actor DictationCore {
     private let feedback: any FeedbackPort
     private let clock: any ClockPort
 
+    /// When the Hotkey went down, as the Clock read it.
+    ///
+    /// The one thing the core keeps of its own: the press has to be timed from
+    /// somewhere, and reading the Clock at both ends is what lets the suite hold
+    /// the key down for a second without waiting one.
+    private var hotkeyPressedAt: Date?
+
     public init(
         hotkey: any HotkeyPort,
         audio: any AudioCapturePort,
@@ -45,8 +54,8 @@ public actor DictationCore {
         self.clock = clock
     }
 
-    /// Starts watching for Activations, so that a tap of the Hotkey runs a
-    /// Dictation while any other app has focus.
+    /// Starts watching for Activations, so that the Hotkey runs a Dictation
+    /// while any other app has focus.
     ///
     /// Throwing means the Hotkey cannot be watched —
     /// `HotkeyFailure.accessibilityDenied` — which the app says out loud rather
@@ -57,18 +66,52 @@ public actor DictationCore {
         }
     }
 
-    /// Takes a gesture from whoever is watching the keyboard.
+    /// Takes a gesture from whoever is watching the keyboard, and times it.
+    ///
+    /// Timing it is the whole of what happens here. Whether a press this long
+    /// was a tap or a Hold is the machine's to answer, and so is what either of
+    /// them means for a Dictation — the core only says when the key went down
+    /// and how long it stayed there.
     ///
     /// It does not throw where `receive(_:)` does, for the same reason `hear(_:)`
     /// does not: the keyboard has nowhere to put an error it was handed back
-    /// between two Dictations, and the tap that failed is already over. What
+    /// between two Dictations, and the press that failed is already over. What
     /// the user is told about a Dictation that failed is the Clipboard Fallback
     /// ticket's.
     private func activated(by gesture: HotkeyEvent) async {
         switch gesture {
-        case .tapped:
-            try? await receive(.activationToggled)
+        case .pressed:
+            hotkeyPressedAt = await clock.now()
+            try? await receive(.hotkeyPressed)
+
+        case .released:
+            let heldFor = await lengthOfThePress()
+            hotkeyPressedAt = nil
+            try? await receive(.hotkeyReleased(heldFor: heldFor))
+
+        case .pressSpoiled:
+            let heldFor = await lengthOfThePress()
+            hotkeyPressedAt = nil
+            try? await receive(.hotkeyPressSpoiled(heldFor: heldFor))
         }
+    }
+
+    /// How long the Hotkey has been down.
+    ///
+    /// Nothing, where there is no press to measure — the key was already down
+    /// when Cheppu started watching. The machine ignores a release it never saw
+    /// begin in any case, so what this answers there does not decide anything.
+    ///
+    /// A Clock that has gone backwards between the two readings — the machine's
+    /// own is stepped by NTP, not counted from a fixed point — is answered with
+    /// the threshold rather than with a span that ran the wrong way, so the
+    /// press reads as a Hold and the Dictation stops. A Dictation that ends a
+    /// moment early costs the user a sentence; one that never ends leaves the
+    /// microphone open on everything they say next.
+    private func lengthOfThePress() async -> Duration {
+        guard let hotkeyPressedAt else { return .zero }
+        let heldFor = Duration.seconds(await clock.now().timeIntervalSince(hotkeyPressedAt))
+        return heldFor < .zero ? DictationMachine.holdThreshold : heldFor
     }
 
     /// The one door into a Dictation.
@@ -76,8 +119,8 @@ public actor DictationCore {
     /// Runs the event through the machine, performs what it asks for, and keeps
     /// going for as long as a port reports something back — capture handing over
     /// what it heard, the Engine returning a Raw Transcript, an Insertion
-    /// landing — so that one tap of the Hotkey runs to the end of what it set in
-    /// motion.
+    /// landing — so that one press of the Hotkey runs to the end of what it set
+    /// in motion.
     ///
     /// An event that arrives while an earlier one is still being carried out
     /// waits its turn rather than interleaving with it, and returns once queued.

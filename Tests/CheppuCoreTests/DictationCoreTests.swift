@@ -15,8 +15,9 @@ extension [PortJournal.Call] {
 }
 
 // These tests drive the core the way the user drives it — a tap, then another
-// tap — and read back what its ports were told. Nothing here looks inside the
-// core, loads a model, opens a microphone, or waits for a clock.
+// tap, or the key held down and let go — and read back what its ports were
+// told. Nothing here looks inside the core, loads a model, opens a microphone,
+// or waits for a clock: a Hold is two seconds long because the Clock says so.
 @Suite("Dictation core")
 struct DictationCoreTests {
     private static let spokenAudio = CapturedAudio(samples: [0.1, -0.2, 0.3], sampleRate: 16_000)
@@ -33,6 +34,12 @@ struct DictationCoreTests {
 
     private static let mail = ATargetApp.mail
     private static let browser = ATargetApp.browser
+
+    /// What every port is told when a Dictation opens, whichever Activation
+    /// opened it.
+    private static let openingADictation: [PortJournal.Call] = [
+        .capturingStarted, .cuePlayed(.dictationStarted), .pillShown(.listening(.silent)),
+    ]
 
     /// A core wired to fakes, plus the journal they all write to.
     private struct Scenario {
@@ -82,18 +89,63 @@ struct DictationCoreTests {
             }
         }
 
+        /// Everything the ports were told, with the moment a History entry was
+        /// stamped with left out.
+        ///
+        /// A Hold takes two seconds off the Clock and a tap takes none, so the
+        /// stamps differ where nothing the user notices does. What is being
+        /// compared is the Dictation, not the hour.
+        var callsIgnoringTimestamps: [PortJournal.Call] {
+            get async {
+                await journal.calls.map { call in
+                    guard case .appendedToHistory(let entry) = call else { return call }
+                    return .appendedToHistory(
+                        HistoryEntry(
+                            finalText: entry.finalText,
+                            recordedAt: DictationCoreTests.aTuesdayAfternoon
+                        )
+                    )
+                }
+            }
+        }
+
+        /// The Hotkey tapped, through the core's own door: down, and up again
+        /// inside the threshold.
+        func tapThroughTheCore() async throws {
+            try await core.receive(.hotkeyPressed)
+            try await core.receive(.hotkeyReleased(heldFor: .milliseconds(120)))
+        }
+
         /// Taps the Hotkey, speaks, and taps it again.
         func toggleADictation() async throws {
-            try await core.receive(.activationToggled)
-            try await core.receive(.activationToggled)
+            try await tapThroughTheCore()
+            try await tapThroughTheCore()
+        }
+
+        /// The Hotkey tapped at the keyboard: down and up again with no time
+        /// worth measuring in between, which is what a tap is.
+        func tapTheHotkey() async {
+            await hotkey.press()
+            await hotkey.release()
+        }
+
+        /// The Hotkey held down for as long as it takes to say something, and
+        /// then let go.
+        ///
+        /// The holding is done to the Clock rather than to the suite, which is
+        /// what makes a two-second Hold cost a test nothing.
+        func holdTheHotkey(for heldFor: Duration = .seconds(2)) async {
+            await hotkey.press()
+            await clock.advance(by: heldFor)
+            await hotkey.release()
         }
 
         /// The same Dictation, driven from the keyboard rather than through the
         /// core's own door.
         func toggleADictationWithTheHotkey() async throws {
             try await core.watchForActivations()
-            await hotkey.tap()
-            await hotkey.tap()
+            await tapTheHotkey()
+            await tapTheHotkey()
         }
     }
 
@@ -147,6 +199,152 @@ struct DictationCoreTests {
         try await scenario.core.watchForActivations()
 
         #expect(await scenario.hotkey.isBeingWatched)
+    }
+
+    // MARK: - Toggle and Hold
+
+    @Test("Releasing the Hotkey inside 250 ms starts a Toggle that runs until the next tap")
+    func releasingTheHotkeyInsideTheThresholdStartsAToggle() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .milliseconds(200))
+        await scenario.hotkey.release()
+
+        // The key is back up and the microphone is still open: a tap starts a
+        // Dictation that goes on running until the user taps again.
+        #expect(await scenario.journal.calls == Self.openingADictation)
+
+        await scenario.tapTheHotkey()
+
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("Holding the Hotkey past 250 ms runs the Dictation only while it is held")
+    func holdingTheHotkeyPastTheThresholdRunsTheDictationOnlyWhileItIsHeld() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .seconds(2))
+
+        // Two seconds in, with the key still down, the Dictation is still
+        // listening: a Hold lasts as long as the user holds it.
+        #expect(await scenario.journal.calls == Self.openingADictation)
+
+        await scenario.hotkey.release()
+
+        // And letting go stops it, all the way through to the words landing.
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("The Dictation starts on the way down, so speech during the threshold is captured")
+    func theDictationStartsOnTheWayDown() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+
+        // Before the Clock has moved at all — before anything could have
+        // decided whether this is a Toggle or a Hold — the microphone is open.
+        // The 250 ms are spent listening rather than waiting.
+        #expect(await scenario.journal.calls.first == .capturingStarted)
+    }
+
+    @Test("Tap and Hold run the same Dictation, so the same key does the obvious thing both ways")
+    func tapAndHoldRunTheSameDictation() async throws {
+        let tapped = Scenario()
+        try await tapped.core.watchForActivations()
+        await tapped.tapTheHotkey()
+        await tapped.tapTheHotkey()
+
+        let held = Scenario()
+        try await held.core.watchForActivations()
+        await held.holdTheHotkey()
+
+        // There is no setting and no mode between these two. Which gesture the
+        // user made is their business, and nothing downstream of the Hotkey can
+        // tell.
+        #expect(await tapped.callsIgnoringTimestamps == held.callsIgnoringTimestamps)
+    }
+
+    @Test("Leaning on the Hotkey to end a Toggle ends it")
+    func leaningOnTheHotkeyToEndAToggleEndsIt() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+        // Started with a tap, finished with a long press. Nobody was taught
+        // that gesture, and it does the obvious thing anyway.
+        await scenario.holdTheHotkey()
+
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("A press that turns out to be typing takes back the Dictation it started")
+    func aPressThatTurnsOutToBeTypingTakesTheDictationBack() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .milliseconds(40))
+        await scenario.hotkey.typeWithItHeld()
+
+        // Right Option types an accented character on several layouts, so a
+        // Dictation begun on the way down has to be handed back when the press
+        // turns out to have been an é. The microphone closes and the Pill goes,
+        // and what it heard goes nowhere: nothing transcribed, nothing
+        // inserted, nothing kept.
+        #expect(
+            await scenario.journal.calls
+                == Self.openingADictation + [.capturingStopped, .pillHidden]
+        )
+
+        // And the next tap starts a Dictation rather than stopping one that was
+        // never really running.
+        await scenario.tapTheHotkey()
+        await scenario.tapTheHotkey()
+
+        #expect(await scenario.insertedText == ["hello there"])
+    }
+
+    @Test("A key brushed during a Hold ends the Dictation rather than throwing away what was said")
+    func aKeyBrushedDuringAHoldEndsTheDictationRatherThanThrowingItAway() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .seconds(3))
+        // Three seconds into a Hold, a stray key. What was said is not thrown
+        // away over it: a press that far in is a Hold rather than an accented
+        // character, and the Dictation ends the way a Hold ends.
+        await scenario.hotkey.typeWithItHeld()
+
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("A tap that stops a Toggle stops it even if the user types before letting go")
+    func aTapThatStopsAToggleStopsItEvenIfTheUserTypesBeforeLettingGo() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+
+        // The user finishes dictating, taps to stop, and their hand lands on
+        // the keyboard before the key is back up — so the press is spoiled and
+        // never released. The Dictation stopped where the press began, and the
+        // words land rather than the microphone being left open on what they
+        // type next.
+        await scenario.hotkey.press()
+        await scenario.hotkey.typeWithItHeld()
+
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
     }
 
     @Test("A Toggle Activation puts the words where the cursor is")
@@ -242,7 +440,7 @@ struct DictationCoreTests {
 
         #expect(await scenario.journal.calls.last == .pillHidden)
 
-        try await scenario.core.receive(.activationToggled)
+        try await scenario.tapThroughTheCore()
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
     }
@@ -266,11 +464,11 @@ struct DictationCoreTests {
         )
     }
 
-    @Test("Stopping a Dictation that was never started touches nothing")
-    func stoppingADictationThatWasNeverStartedTouchesNothing() async throws {
+    @Test("Letting go of a Hotkey that started nothing touches nothing")
+    func lettingGoOfAHotkeyThatStartedNothingTouchesNothing() async throws {
         let scenario = Scenario()
 
-        try await scenario.core.receive(.activationStopped)
+        try await scenario.core.receive(.hotkeyReleased(heldFor: .seconds(2)))
 
         #expect(await scenario.journal.calls.isEmpty)
     }
@@ -292,11 +490,11 @@ struct DictationCoreTests {
     func theTargetAppIsTheAppFocusedWhenTheDictationStops() async throws {
         let scenario = Scenario(typingIn: Self.mail)
 
-        try await scenario.core.receive(.activationToggled)
+        try await scenario.tapThroughTheCore()
         // The user carries on speaking while they click into another app, which
         // is where they meant the words to go.
         await scenario.focus.moveTo(Self.browser)
-        try await scenario.core.receive(.activationToggled)
+        try await scenario.tapThroughTheCore()
 
         #expect(
             await scenario.journal.calls.contains(
@@ -336,7 +534,7 @@ struct DictationCoreTests {
 
         // And the Dictation ended, so the next tap of the Hotkey starts one
         // rather than trying to stop the one that never finished.
-        try await scenario.core.receive(.activationToggled)
+        try await scenario.tapThroughTheCore()
         let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
         #expect(timesCaptureOpened == 2)
     }
