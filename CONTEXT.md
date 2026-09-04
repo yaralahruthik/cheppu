@@ -46,6 +46,10 @@ _Avoid_: transcription, output
 The deterministic, rule-based transformation of a Raw Transcript into Final Text. Never involves a language model.
 _Avoid_: post-processing, AI rewrite, formatting, enhancement
 
+**Filler Word**:
+One of a fixed, committed list of hesitation sounds — "um" and "uh", and the spellings the Engine gives them — that Cleanup drops. Only hesitation is on the list: "hmm", "ah" and "like" carry meaning, and dropping one would turn what the user said into something they did not.
+_Avoid_: stop word, disfluency, verbal tic, hesitation marker
+
 **Final Text**:
 The text that is inserted into the Target App and kept in History. What the user thinks of as "what I said".
 _Avoid_: result, cleaned transcript

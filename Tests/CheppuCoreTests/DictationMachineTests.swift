@@ -24,10 +24,10 @@ struct DictationMachineTests {
     private let browser = ATargetApp.browser
 
     private let heardWords = RawTranscript(
-        text: "hello there",
+        text: "Hello there.",
         words: [
-            WordTiming(word: "hello", start: .milliseconds(0), end: .milliseconds(400)),
-            WordTiming(word: "there", start: .milliseconds(520), end: .milliseconds(900)),
+            WordTiming(word: "Hello", start: .milliseconds(0), end: .milliseconds(400)),
+            WordTiming(word: "there.", start: .milliseconds(520), end: .milliseconds(900)),
         ]
     )
 
@@ -283,8 +283,8 @@ struct DictationMachineTests {
                 .playCue(.dictationStopped),
                 .showPill(.transcribing),
                 .transcribe(spokenAudio),
-                .recordInHistory(FinalText("hello there")),
-                .insert(FinalText("hello there"), into: mail),
+                .recordInHistory(FinalText("Hello there.")),
+                .insert(FinalText("Hello there."), into: mail),
                 .hidePill,
             ]
         )
@@ -349,8 +349,8 @@ struct DictationMachineTests {
 
         #expect(
             effects.decides(
-                .recordInHistory(FinalText("hello there")),
-                before: .insert(FinalText("hello there"), into: mail)
+                .recordInHistory(FinalText("Hello there.")),
+                before: .insert(FinalText("Hello there."), into: mail)
             )
         )
     }
@@ -461,7 +461,7 @@ struct DictationMachineTests {
 
         #expect(
             machine.receive(.rawTranscriptReceived(heardWords))
-                .contains(.insert(FinalText("hello there"), into: browser)))
+                .contains(.insert(FinalText("Hello there."), into: browser)))
     }
 
     @Test("The Target App one Dictation noted is never the next one's")
@@ -476,8 +476,8 @@ struct DictationMachineTests {
 
         #expect(
             machine.receive(.rawTranscriptReceived(heardWords)) == [
-                .recordInHistory(FinalText("hello there")),
-                .insert(FinalText("hello there"), into: browser),
+                .recordInHistory(FinalText("Hello there.")),
+                .insert(FinalText("Hello there."), into: browser),
             ])
     }
 
@@ -494,10 +494,46 @@ struct DictationMachineTests {
         // Telling the user, and leaving the text on the clipboard, is #14's.
         #expect(
             machine.receive(.rawTranscriptReceived(heardWords)) == [
-                .recordInHistory(FinalText("hello there")),
+                .recordInHistory(FinalText("Hello there.")),
                 .hidePill,
             ])
         #expect(tap(&machine) == openingADictation)
+    }
+
+    // MARK: - Cleanup
+
+    /// A Dictation carried as far as the Engine answering, so that what the
+    /// machine does with a Raw Transcript is all that is left to say.
+    private func transcribed(_ transcript: RawTranscript) -> [DictationEffect] {
+        var machine = DictationMachine()
+        hold(&machine)
+        _ = machine.receive(.targetAppNoted(mail))
+        _ = machine.receive(.audioCaptured(spokenAudio))
+        return machine.receive(.rawTranscriptReceived(transcript))
+    }
+
+    @Test("What is inserted and kept is the Raw Transcript with Cleanup applied")
+    func whatIsInsertedAndKeptIsTheRawTranscriptWithCleanupApplied() {
+        // Cleanup stands between the Engine and everything downstream of it, so
+        // there is one Final Text and both History and the Target App get it.
+        #expect(
+            transcribed(ARawTranscript.saidWithAPause) == [
+                .recordInHistory(FinalText("That is one thought.\nThe next one")),
+                .insert(FinalText("That is one thought.\nThe next one"), into: mail),
+            ])
+    }
+
+    @Test("A Dictation that was nothing but a Filler Word is Discarded")
+    func aDictationThatWasNothingButAFillerWordIsDiscarded() {
+        let clearingAThroat = RawTranscript(
+            text: "um",
+            words: [WordTiming(word: "um", start: .zero, end: .milliseconds(200))]
+        )
+
+        // Cleanup leaves nothing behind, so there is nothing to insert and
+        // nothing worth keeping. It ends the way any Dictation with no words in
+        // it ends: silently, and without moving the user's cursor.
+        #expect(transcribed(clearingAThroat) == [.hidePill])
     }
 
     @Test("Final Text never carries the whitespace the Engine left around it")
@@ -507,7 +543,7 @@ struct DictationMachineTests {
         _ = machine.receive(.targetAppNoted(mail))
         _ = machine.receive(.audioCaptured(spokenAudio))
 
-        let spacedOut = RawTranscript(text: "  hello there\n", words: heardWords.words)
+        let spacedOut = RawTranscript(text: "  Hello there.\n", words: heardWords.words)
 
         // Inserted into the middle of a sentence, the Engine's own leading
         // space would double the one already in front of the cursor. History
@@ -516,8 +552,8 @@ struct DictationMachineTests {
         // Transcript byte for byte (#11).
         #expect(
             machine.receive(.rawTranscriptReceived(spacedOut)) == [
-                .recordInHistory(FinalText("  hello there\n")),
-                .insert(FinalText("hello there"), into: mail),
+                .recordInHistory(FinalText("  Hello there.\n")),
+                .insert(FinalText("Hello there."), into: mail),
             ])
     }
 

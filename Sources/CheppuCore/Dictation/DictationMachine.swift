@@ -159,6 +159,14 @@ public struct DictationMachine: Sendable {
     /// has been left running rather than one being spoken into.
     public static let cap: Duration = .seconds(5 * 60)
 
+    /// The Cleanup this Dictation's words go through on their way to the
+    /// Target App.
+    ///
+    /// Held here rather than reached for, because which rules are on is the
+    /// user's and not the machine's: the app hands it whichever switches the
+    /// Settings window (#15) is showing, and the machine applies them.
+    private let cleanup: Cleanup
+
     private(set) var state: DictationState
 
     /// Whether the press currently holding the Hotkey down is the one that
@@ -182,8 +190,11 @@ public struct DictationMachine: Sendable {
     /// may be somewhere else and the answer would be the wrong app.
     private var targetApp: TargetApp?
 
-    public init() {
+    /// - Parameter rules: which Cleanup rules a Dictation's words go through.
+    ///   Every rule on unless the user has turned one off.
+    public init(cleaningWith rules: CleanupRules = .all) {
         self.state = .idle
+        self.cleanup = Cleanup(rules)
     }
 
     /// Takes an event and answers with what should happen, in the order it
@@ -313,9 +324,10 @@ public struct DictationMachine: Sendable {
             return [.transcribe(audio)]
 
         case (.transcribing, .rawTranscriptReceived(let transcript)):
-            // Cleanup stands between the Raw Transcript and the Final Text from
-            // its own ticket onwards. Until then the words go in as heard.
-            let finalText = FinalText(transcript.text)
+            // Cleanup stands between the Raw Transcript and the Final Text, and
+            // is the only thing that does: there is one Final Text, and History
+            // and the Target App are given the same one.
+            let finalText = cleanup.finalText(from: transcript)
 
             // Discard. The Engine heard no words in this Dictation, so there is
             // nothing to insert and nothing worth keeping, and it ends without
@@ -326,7 +338,9 @@ public struct DictationMachine: Sendable {
             // Engine handed back, because a Dictation with no speech in it
             // comes back as a space and a newline as often as it comes back
             // empty, and inserting those would be a stray tap that moved the
-            // user's cursor.
+            // user's cursor. Measured after Cleanup for the same reason: a
+            // Dictation that was one clearing of the throat has nothing in it
+            // once the filler is gone.
             guard !finalText.normalisedForInsertion.text.isEmpty else {
                 state = .idle
                 return [.hidePill]

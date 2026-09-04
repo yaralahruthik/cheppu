@@ -10,7 +10,7 @@ import Foundation
 /// It holds every port even where a later ticket is what will first use one, so
 /// that the seam the app target wires itself into does not move underneath it.
 public actor DictationCore {
-    private var machine = DictationMachine()
+    private var machine: DictationMachine
 
     /// Events waiting their turn. One Dictation's effects are carried out in
     /// order and to the end before the next event is looked at, because the
@@ -34,7 +34,11 @@ public actor DictationCore {
     /// the key down for a second without waiting one.
     private var hotkeyPressedAt: Date?
 
+    /// - Parameter rules: which Cleanup rules a Dictation's words go through on
+    ///   their way to the Target App. Every rule on unless the user has turned
+    ///   one off.
     public init(
+        cleaningWith rules: CleanupRules,
         hotkey: any HotkeyPort,
         audio: any AudioCapturePort,
         engine: any EnginePort,
@@ -44,6 +48,7 @@ public actor DictationCore {
         feedback: any FeedbackPort,
         clock: any ClockPort
     ) {
+        self.machine = DictationMachine(cleaningWith: rules)
         self.hotkey = hotkey
         self.audio = audio
         self.engine = engine
