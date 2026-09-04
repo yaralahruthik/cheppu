@@ -44,6 +44,11 @@ actor FakeHotkey: HotkeyPort {
         await reportTo?(.pressSpoiled)
     }
 
+    /// The user presses Escape, wherever they are and whatever Cheppu is doing.
+    func pressEscape() async {
+        await reportTo?(.escapePressed)
+    }
+
     /// Whether anything is listening for the Hotkey.
     var isBeingWatched: Bool { reportTo != nil }
 }
@@ -201,6 +206,10 @@ struct FakeFeedback: FeedbackPort {
 actor FakeClock: ClockPort {
     private var reading: Date
 
+    /// The wait under way, and the moment it ends. There is one at a time here
+    /// for the same reason there is one on a real Clock.
+    private var waiting: (until: Date, whatFollows: @Sendable () async -> Void)?
+
     init(reading: Date) {
         self.reading = reading
     }
@@ -209,8 +218,27 @@ actor FakeClock: ClockPort {
         reading
     }
 
-    func advance(by duration: Duration) {
+    /// Notes the wait rather than taking it. Nothing happens until the test
+    /// moves the Clock past the end of it.
+    func waitOut(_ span: Duration, then whatFollows: @escaping @Sendable () async -> Void) async {
+        waiting = (reading + span.asTimeInterval, whatFollows)
+    }
+
+    func stopWaiting() async {
+        waiting = nil
+    }
+
+    /// Moves the Clock on, and runs whatever was waiting for a moment now past.
+    ///
+    /// It does not return until everything that wait set in motion has finished,
+    /// so a test that moves the Clock five minutes on can read back the whole
+    /// Dictation the Cap ended without ever wondering whether it is over.
+    func advance(by duration: Duration) async {
         reading += duration.asTimeInterval
+
+        guard let waiting, waiting.until <= reading else { return }
+        self.waiting = nil
+        await waiting.whatFollows()
     }
 }
 

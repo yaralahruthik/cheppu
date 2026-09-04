@@ -16,7 +16,7 @@ import Foundation
 /// Clock and the answer to "is a Dictation already running", and the keyboard
 /// has neither. So the port reports the gesture and the machine decides, which
 /// is what keeps a press after the Cap has ended a Dictation a start rather
-/// than a stop nobody is waiting for. Escape joins them with #9.
+/// than a stop nobody is waiting for.
 public enum HotkeyEvent: Equatable, Sendable {
     /// The Hotkey went down on its own: nothing else held, and nothing typed
     /// with it yet.
@@ -32,6 +32,16 @@ public enum HotkeyEvent: Equatable, Sendable {
     /// because a Dictation that should never have started is one the microphone
     /// should not still be open for.
     case pressSpoiled
+
+    /// Escape went down.
+    ///
+    /// Reported wherever the user pressed it and whatever else was held at the
+    /// time, because whether it means anything is not the keyboard's to decide:
+    /// Escape is Cancel while a Dictation is Listening and is the user's own
+    /// business at every other moment. It is reported rather than taken —
+    /// Cheppu's watch on the keyboard can read a key and cannot swallow one
+    /// (ADR-0006) — so the app the user is in receives it either way.
+    case escapePressed
 }
 
 /// Where Activation gestures come from.
@@ -154,12 +164,30 @@ public protocol FeedbackPort: Sendable {
     func play(_ cue: Cue) async
 }
 
-/// Every reading of the time the core takes.
+/// Every reading of the time the core takes, and every wait it does.
 ///
-/// Nothing in the core calls a system clock directly, so a test can stamp a
-/// History entry, and hold the Hotkey down for a second, without waiting. The
-/// waiting half of this port arrives with the Cap, which is the first thing
-/// that needs it.
+/// Nothing in the core calls a system clock directly and nothing in it sleeps,
+/// so a test can stamp a History entry, hold the Hotkey down for a second, and
+/// leave a Dictation running for five minutes, without waiting for any of them.
 public protocol ClockPort: Sendable {
     func now() async -> Date
+
+    /// Waits out a span and then does what it was given to do, unless the wait
+    /// is called off before it ends.
+    ///
+    /// The waiting belongs here rather than to the core. Cheppu waits for
+    /// exactly one thing — the Cap — and a core that ran its own timer would be
+    /// a core whose five minutes could only be reached by waiting five minutes.
+    ///
+    /// It returns once the wait has begun rather than when it ends, because
+    /// arming the Cap happens on the way into a Dictation and must cost it
+    /// nothing.
+    ///
+    /// One wait at a time: starting another calls off the one before it, so a
+    /// Clock can never be counting for two Dictations at once.
+    func waitOut(_ span: Duration, then whatFollows: @escaping @Sendable () async -> Void) async
+
+    /// Calls off the wait that is under way, if there is one, so that what
+    /// follows it never happens.
+    func stopWaiting() async
 }

@@ -23,7 +23,7 @@ An Activation where the Dictation runs only while the Hotkey is held down and st
 _Avoid_: push-to-talk, PTT, press-and-hold
 
 **Spoiled Press**:
-A press of the Hotkey that turns out to be typing — a key struck, or another modifier joined, inside the quarter-second that tells a tap from a Hold. The Dictation it opened on the way down is taken back at once and never transcribed: it ends a Dictation the user never asked for, unlike Cancel and Discard, which end one they meant. The start Cue has already played and no stop Cue answers it, which is the price of starting on the way down. A key struck later belongs to a Hold, and what was said is kept.
+A press of the Hotkey that turns out to be typing — a key struck, or another modifier joined, inside the quarter-second that tells a tap from a Hold. Escape is not one of those keys: held with the Hotkey it Cancels, because someone reaching for it is throwing the Dictation away rather than typing. The Dictation it opened on the way down is taken back at once and never transcribed: it ends a Dictation the user never asked for, unlike Cancel and Discard, which end one they meant. The start Cue has already played and no stop Cue answers it, which is the price of starting on the way down. A key struck later belongs to a Hold, and what was said is kept.
 _Avoid_: false trigger, accidental activation, misfire
 
 **Hotkey**:
@@ -59,7 +59,7 @@ What happens when Insertion is not possible: Final Text is left on the clipboard
 _Avoid_: copy mode, error
 
 **Cancel**:
-Aborting a Dictation while listening, via Escape. The audio is discarded and nothing is inserted or kept.
+Aborting a Dictation while listening, via Escape. The audio is discarded and nothing is inserted or kept. Answered with a Cue of its own, because Escape is never taken from the app the user is in (ADR-0006) and there would otherwise be nothing to tell them Cheppu heard it.
 _Avoid_: abort, stop
 
 **Discard**:
@@ -89,7 +89,7 @@ How loud the microphone is hearing, from silence to the loudest it can hear, rep
 _Avoid_: volume, amplitude, meter, VU
 
 **Cue**:
-A short sound played when a Dictation starts and when it stops.
+A short sound played when a Dictation starts, when it stops, and when it is Cancelled. The Cancel Cue is distinct from the stop Cue, which says the words are on their way.
 _Avoid_: beep, chime, sound effect
 
 **History**:

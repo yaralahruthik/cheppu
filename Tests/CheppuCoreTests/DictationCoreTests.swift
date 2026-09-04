@@ -551,4 +551,185 @@ struct DictationCoreTests {
 
         #expect(await scenario.insertedText == ["hello there"])
     }
+
+
+    // MARK: - Cancel
+
+    @Test("Escape while it is listening throws the whole Dictation away")
+    func escapeWhileItIsListeningThrowsTheWholeDictationAway() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+        // The user misspoke. Everything that follows is the Dictation being
+        // handed back: the microphone closes, a Cue of its own says so, and the
+        // Pill goes. The Engine is never asked, nothing is inserted, and
+        // nothing reaches History.
+        await scenario.hotkey.pressEscape()
+
+        #expect(
+            await scenario.journal.calls
+                == Self.openingADictation
+                + [.capturingStopped, .cuePlayed(.dictationCancelled), .pillHidden]
+        )
+    }
+
+    @Test("A Cancelled Dictation leaves Cheppu ready for the next one")
+    func aCancelledDictationLeavesCheppuReadyForTheNextOne() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .seconds(2))
+        // Escape while the key is still down: a Hold is Cancelled the same way
+        // a Toggle is, and letting go afterwards belongs to a Dictation that is
+        // already over.
+        await scenario.hotkey.pressEscape()
+        await scenario.hotkey.release()
+
+        #expect(await scenario.insertedText.isEmpty)
+
+        // And nothing is left counting for it: five minutes on, the Cap that
+        // belonged to the Cancelled Dictation is not still out there to end
+        // whatever the user is doing by then.
+        let afterTheCancel = await scenario.journal.calls
+        await scenario.clock.advance(by: .seconds(5 * 60))
+        #expect(await scenario.journal.calls == afterTheCancel)
+
+        await scenario.tapTheHotkey()
+        await scenario.tapTheHotkey()
+
+        #expect(await scenario.insertedText == ["hello there"])
+    }
+
+    @Test("Escape when no Dictation is listening touches nothing")
+    func escapeWhenNoDictationIsListeningTouchesNothing() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        // Someone closing a dialog in the app they are working in. Cheppu is
+        // handed the key like every other one it was not sent, and does nothing
+        // with it.
+        await scenario.hotkey.pressEscape()
+
+        #expect(await scenario.journal.calls.isEmpty)
+
+        // And after a Dictation has landed, it is nothing to it either.
+        await scenario.tapTheHotkey()
+        await scenario.tapTheHotkey()
+        let afterTheDictation = await scenario.journal.calls
+        await scenario.hotkey.pressEscape()
+
+        #expect(await scenario.journal.calls == afterTheDictation)
+    }
+
+    // MARK: - Discard
+
+    @Test("A Dictation with no speech in it disappears silently")
+    func aDictationWithNoSpeechInItDisappearsSilently() async throws {
+        // The Hotkey tapped by accident, and tapped again: the Engine heard
+        // nothing in it.
+        let scenario = Scenario(hears: RawTranscript(text: "", words: []))
+
+        try await scenario.toggleADictation()
+
+        // Nothing inserted and nothing in History, so a stray tap litters
+        // neither the user's document nor the record of what they said.
+        #expect(
+            await scenario.journal.calls == Self.openingADictation + [
+                .capturingStopped,
+                .cuePlayed(.dictationStopped),
+                .pillShown(.transcribing),
+                .transcribed(Self.spokenAudio),
+                .pillHidden,
+            ]
+        )
+    }
+
+    @Test("A Dictation the Engine answered with whitespace is Discarded too")
+    func aDictationTheEngineAnsweredWithWhitespaceIsDiscardedToo() async throws {
+        // What Parakeet hands back for a Dictation with no speech in it is a
+        // space and a newline as often as it is nothing at all. Inserting those
+        // would be a stray tap that moved the user's cursor.
+        let scenario = Scenario(hears: RawTranscript(text: " \n", words: []))
+
+        try await scenario.toggleADictation()
+
+        #expect(await scenario.insertedText.isEmpty)
+        #expect(await scenario.journal.calls.last == .pillHidden)
+
+        // And Cheppu is ready for the next one.
+        try await scenario.tapThroughTheCore()
+        let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
+        #expect(timesCaptureOpened == 2)
+    }
+
+    // MARK: - The Cap
+
+    @Test("A Dictation left running stops itself at five minutes and is transcribed as any other")
+    func aDictationLeftRunningStopsItselfAtFiveMinutes() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+
+        // A second short of the Cap the user could still walk back and finish
+        // the sentence: the microphone is open and nothing has been decided.
+        await scenario.clock.advance(by: .seconds(5 * 60 - 1))
+        #expect(await scenario.journal.calls == Self.openingADictation)
+
+        // The five minutes pass on the Clock rather than in the suite.
+        await scenario.clock.advance(by: .seconds(1))
+
+        // And what they did say is transcribed and inserted exactly as it would
+        // have been had they stopped it themselves.
+        #expect(await scenario.insertedText == ["hello there"])
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("A Dictation the user ended leaves the Cap counting for nobody")
+    func aDictationTheUserEndedLeavesTheCapCountingForNobody() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+        await scenario.tapTheHotkey()
+
+        // The user starts another two minutes later. Three minutes after that,
+        // the first Dictation's five would have been up — and the second is
+        // still listening, because one Dictation's Cap can never end over the
+        // top of the next one.
+        await scenario.clock.advance(by: .seconds(2 * 60))
+        await scenario.tapTheHotkey()
+        await scenario.clock.advance(by: .seconds(3 * 60))
+
+        #expect(await scenario.insertedText == ["hello there"])
+
+        // The second Dictation's five minutes are its own, and two more of them
+        // are what ends it.
+        await scenario.clock.advance(by: .seconds(2 * 60))
+
+        #expect(await scenario.insertedText == ["hello there", "hello there"])
+    }
+
+    @Test("The Cap stops a Hold that is still being held")
+    func theCapStopsAHoldThatIsStillBeingHeld() async throws {
+        let scenario = Scenario()
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.clock.advance(by: .seconds(5 * 60))
+
+        #expect(await scenario.insertedText == ["hello there"])
+
+        // The key is still down five minutes later. Letting go of it belongs to
+        // a Dictation that is over, and must not stop the next one before it
+        // has begun.
+        await scenario.hotkey.release()
+        await scenario.tapTheHotkey()
+
+        let timesCaptureOpened = await scenario.journal.calls.filter { $0 == .capturingStarted }.count
+        #expect(timesCaptureOpened == 2)
+        #expect(await scenario.journal.calls.last == .pillShown(.listening(.silent)))
+    }
 }

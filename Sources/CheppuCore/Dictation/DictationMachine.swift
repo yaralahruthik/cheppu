@@ -19,8 +19,7 @@ public enum DictationState: Equatable, Sendable {
 /// Something that happened to a Dictation.
 ///
 /// Some come from the user by way of the Hotkey port; the rest are a port
-/// reporting back what it was asked to do. Cancel, Discard and the Cap arrive
-/// with their own tickets.
+/// reporting back what it was asked to do.
 public enum DictationEvent: Equatable, Sendable {
     /// The Hotkey went down on its own.
     ///
@@ -67,6 +66,24 @@ public enum DictationEvent: Equatable, Sendable {
     /// Dictation left running here would be one nothing could end.
     case hotkeyPressSpoiled(heldFor: Duration)
 
+    /// Escape, wherever the user pressed it.
+    ///
+    /// It means Cancel while a Dictation is Listening and nothing at all at
+    /// every other moment, which is why every Escape is reported and the
+    /// machine decides what it meant. The key itself is never taken from the
+    /// app the user is typing in: Cheppu can read a keystroke and cannot
+    /// swallow one (ADR-0006), so an Escape that Cancels a Dictation also does
+    /// whatever Escape does where they are.
+    case escapePressed
+
+    /// Five minutes of this Dictation have gone by.
+    ///
+    /// The Cap, and the only thing other than the user that ever ends a
+    /// Dictation they meant. What was said is transcribed and kept: someone who
+    /// walked away has not asked for their afternoon to be recorded, and
+    /// someone mid-paragraph has not asked to lose it.
+    case capReached
+
     /// Who had focus at the moment the Dictation stopped, which is who the
     /// Insertion is for. Nothing, where no app had focus at all.
     case targetAppNoted(TargetApp?)
@@ -91,6 +108,18 @@ public enum DictationEvent: Equatable, Sendable {
 public enum DictationEffect: Equatable, Sendable {
     case startCapturing
     case stopCapturing
+
+    /// Start the five minutes at the end of which a Dictation stops itself.
+    ///
+    /// The waiting belongs to the Clock rather than to the machine or the core,
+    /// so that nothing in Cheppu holds a timer of its own and the suite can
+    /// reach the Cap without waiting five minutes for it.
+    case startTheCap
+
+    /// Call the Cap off, because the Dictation it was counting for has stopped
+    /// Listening. Decided on every way out, so that one Dictation's five
+    /// minutes can never end over the top of the next one.
+    case stopTheCap
 
     /// Ask who has focus, so that the Insertion has somewhere to go once the
     /// Engine is done.
@@ -123,6 +152,13 @@ public struct DictationMachine: Sendable {
     /// read correctly.
     public static let holdThreshold: Duration = .milliseconds(250)
 
+    /// How long one Dictation may run before it stops itself.
+    ///
+    /// A fixed constant rather than a setting (#1), and long enough that nobody
+    /// dictating a paragraph ever meets it: five minutes is a Dictation that
+    /// has been left running rather than one being spoken into.
+    public static let cap: Duration = .seconds(5 * 60)
+
     private(set) var state: DictationState
 
     /// Whether the press currently holding the Hotkey down is the one that
@@ -131,9 +167,9 @@ public struct DictationMachine: Sendable {
     /// The only thing letting go of the key needs to know, and the one thing
     /// the keyboard cannot tell it: whether a Dictation was already running
     /// when the key went down. A keyboard keeping its own copy of that would be
-    /// wrong the moment a Dictation ended without it — a failure today, the Cap
-    /// and a Cancel with #9 — and the user's next press would do the opposite
-    /// of what they meant.
+    /// wrong the moment a Dictation ended without it — a failure, a Cancel, the
+    /// Cap — and the user's next press would do the opposite of what they
+    /// meant.
     ///
     /// False for a press that came down on a Dictation already running, for one
     /// that turned out to be typing, and for one that was already down when
@@ -166,8 +202,13 @@ public struct DictationMachine: Sendable {
             // default.
             targetApp = nil
             // Capture opens before the Cue plays: the sound is feedback, but a
-            // word spoken before the microphone is open is gone.
-            return [.startCapturing, .playCue(.dictationStarted), .showPill(.listening(.silent))]
+            // word spoken before the microphone is open is gone. The Cap starts
+            // with the microphone, so that its five minutes are five minutes of
+            // audio rather than of whatever else a Dictation does first.
+            return [
+                .startCapturing, .startTheCap, .playCue(.dictationStarted),
+                .showPill(.listening(.silent)),
+            ]
 
         case (.listening, .hotkeyPressed):
             // A Dictation is already running, so this press is the second tap
@@ -186,7 +227,6 @@ public struct DictationMachine: Sendable {
             // character mid-Dictation stops the Dictation. That is the
             // documented meaning of the key while one is running, and the words
             // are transcribed and kept rather than lost.
-            thisPressOpenedTheDictation = false
             return stopListening()
 
         case (.listening, .hotkeyReleased(let heldFor)):
@@ -233,8 +273,30 @@ public struct DictationMachine: Sendable {
             // back until the threshold had passed would cost every real
             // Dictation the confirmation it exists to give the instant the key
             // goes down.
-            state = .idle
-            return [.stopCapturing, .hidePill]
+            return handBackTheDictation() + [.hidePill]
+
+        case (.listening, .escapePressed):
+            // Cancel. The user misspoke, or thought better of it: the whole
+            // Dictation is thrown away where it stands. The microphone closes,
+            // what it heard is let go of rather than transcribed, and nothing
+            // is inserted or kept.
+            //
+            // It is answered with a Cue of its own, which is the whole of what
+            // tells Cancel from Discard from outside Cheppu. The user did this
+            // on purpose with their eyes on their work
+            // (`docs/product-experience.md` §3), and Escape is not taken from
+            // the app they are in (ADR-0006), so silence would leave them with
+            // no way of knowing Cheppu heard it. The stop Cue would be worse
+            // than silence: it says the words are on their way.
+            return handBackTheDictation() + [.playCue(.dictationCancelled), .hidePill]
+
+        case (.listening, .capReached):
+            // Five minutes, and the user has not come back. The Dictation ends
+            // exactly as it would have had they ended it themselves, and what
+            // they did say is transcribed and kept: a forgotten Toggle is
+            // someone who walked away, not someone who wanted their words
+            // thrown away.
+            return stopListening()
 
         case (.transcribing, .targetAppNoted(let app)):
             targetApp = app
@@ -254,6 +316,21 @@ public struct DictationMachine: Sendable {
             // Cleanup stands between the Raw Transcript and the Final Text from
             // its own ticket onwards. Until then the words go in as heard.
             let finalText = FinalText(transcript.text)
+
+            // Discard. The Engine heard no words in this Dictation, so there is
+            // nothing to insert and nothing worth keeping, and it ends without
+            // saying anything about it: a Hotkey tapped by accident must litter
+            // neither the user's document nor their History.
+            //
+            // Measured on what would have been inserted rather than on what the
+            // Engine handed back, because a Dictation with no speech in it
+            // comes back as a space and a newline as often as it comes back
+            // empty, and inserting those would be a stray tap that moved the
+            // user's cursor.
+            guard !finalText.normalisedForInsertion.text.isEmpty else {
+                state = .idle
+                return [.hidePill]
+            }
 
             // Nothing had focus when the Dictation stopped, so there is nowhere
             // for the words to be typed. They are still the user's — History is
@@ -279,11 +356,17 @@ public struct DictationMachine: Sendable {
             // last job is to get out of the way.
             return [.hidePill]
 
-        case (.listening, .dictationFailed), (.transcribing, .dictationFailed),
-            (.inserting, .dictationFailed):
+        case (.listening, .dictationFailed):
             state = .idle
             // Whatever the Hotkey is doing belongs to a Dictation that is over.
             // Letting go of it must not stop the next one.
+            thisPressOpenedTheDictation = false
+            // The microphone never opened, or stopped being able to hear, so
+            // there is no Dictation left for the Cap to be counting for.
+            return [.stopTheCap, .hidePill]
+
+        case (.transcribing, .dictationFailed), (.inserting, .dictationFailed):
+            state = .idle
             thisPressOpenedTheDictation = false
             return [.hidePill]
 
@@ -292,7 +375,8 @@ public struct DictationMachine: Sendable {
         }
     }
 
-    /// Ends the Dictation that is Listening, whichever Activation ended it.
+    /// Ends the Dictation that is Listening, whatever ended it: either
+    /// Activation, a press spoiled deep into a Hold, or the Cap.
     ///
     /// Who has focus is read first and at once: it is the definition of the
     /// Target App, and everything after this — closing the microphone, the Cue
@@ -302,10 +386,33 @@ public struct DictationMachine: Sendable {
     /// the sounds the Engine is later asked to transcribe. The Pill says
     /// "transcribing" before the Engine is asked, so the pause that follows is
     /// never mistaken for a hang.
+    /// Hands back the Dictation that is Listening without transcribing it.
+    ///
+    /// The other end of `stopListening()`, and the whole of what Cancel and a
+    /// press that turned out to be typing have in common: the microphone
+    /// closes, what it heard goes nowhere, and the Cap stops counting for a
+    /// Dictation that is over. Nobody is asked who has focus, because nothing
+    /// is going anywhere.
+    ///
+    /// What the user is told about it is the caller's, and it is the only
+    /// difference between the two: Cancel is answered out loud because they
+    /// asked for it, and a press that was really an é is taken back in silence
+    /// because they never asked for anything.
+    private mutating func handBackTheDictation() -> [DictationEffect] {
+        state = .idle
+        thisPressOpenedTheDictation = false
+        return [.stopCapturing, .stopTheCap]
+    }
+
     private mutating func stopListening() -> [DictationEffect] {
         state = .transcribing
+        // Whatever the Hotkey is doing from here belongs to a Dictation that
+        // has stopped Listening — a key still held five minutes into a Hold the
+        // Cap has just ended, say. Letting go of it must not stop the next one.
+        thisPressOpenedTheDictation = false
         return [
-            .noteTargetApp, .stopCapturing, .playCue(.dictationStopped), .showPill(.transcribing),
+            .noteTargetApp, .stopCapturing, .stopTheCap, .playCue(.dictationStopped),
+            .showPill(.transcribing),
         ]
     }
 }

@@ -93,6 +93,12 @@ public actor DictationCore {
             let heldFor = await lengthOfThePress()
             hotkeyPressedAt = nil
             try? await receive(.hotkeyPressSpoiled(heldFor: heldFor))
+
+        case .escapePressed:
+            // Untimed, unlike the three above: how long Escape was held is not
+            // the difference between two gestures, and there is only one thing
+            // it can mean.
+            try? await receive(.escapePressed)
         }
     }
 
@@ -157,6 +163,16 @@ public actor DictationCore {
         }
     }
 
+    /// Takes the Cap from the Clock, five minutes into a Dictation.
+    ///
+    /// It does not throw where `receive(_:)` does, for the same reason `hear(_:)`
+    /// does not: the Clock has nowhere to put an error it was handed back, and
+    /// the Dictation the Cap ended is the one that failed. What the user is told
+    /// about a Dictation that failed is the Clipboard Fallback ticket's.
+    private func capReached() async {
+        try? await receive(.capReached)
+    }
+
     /// Takes a level from whoever is holding the microphone.
     ///
     /// It does not throw where `receive(_:)` does, because the microphone has
@@ -183,6 +199,20 @@ public actor DictationCore {
 
         case .stopCapturing:
             return .audioCaptured(try await audio.stopCapturing())
+
+        case .startTheCap:
+            // The waiting is the Clock's. What comes back comes back through
+            // the same door every other event does, so that a Cap which ends
+            // over a Dictation that is already stopping is a decision the
+            // machine gets to ignore.
+            await clock.waitOut(DictationMachine.cap) { [weak self] in
+                await self?.capReached()
+            }
+            return nil
+
+        case .stopTheCap:
+            await clock.stopWaiting()
+            return nil
 
         case .noteTargetApp:
             return .targetAppNoted(await insertion.focusedApp())
