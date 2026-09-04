@@ -1,0 +1,66 @@
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_c84f24b174d97c::t_a541d6d088d837 105
+  s_c84f24b174d97c::t_49b3e3bf586f9d 94-95,97-104,106-110,114-116
+  s_c84f24b174d97c::t_36030607c33a1e 111-113
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_c84f24b174d97c::t_a8a567e2c0cda5 206-212,214-231,233-238,240-245,247-258,261-270
+  s_c84f24b174d97c::t_a541d6d088d837 205,213,232,239,246
+  s_c84f24b174d97c::t_6adf05abb9be64 259-260
+Sources/CheppuCore/Insertion/Terminal.swift
+  s_c84f24b174d97c::t_44a2fe1cab8f1c 2,4-10,12-16,18-22,24-45,47-48,50-51,53-71,73,75-84
+  s_c84f24b174d97c::t_a541d6d088d837 1,3,11,17,23,46,49,52,72,74
+CONTEXT.md
+  s_c84f24b174d97c::t_ab8a356cc711c0 85,88
+  s_c84f24b174d97c::t_b2da0a298dc6e4 86
+  s_c84f24b174d97c::t_ed3ad01b965a57 87
+README.md
+  s_c84f24b174d97c::t_bfb31ab4609141 37
+  s_c84f24b174d97c::t_99ae855cb08667 83
+Sources/CheppuCore/Insertion/TargetApp.swift
+  s_c84f24b174d97c::t_a541d6d088d837 17
+  s_c84f24b174d97c::t_7c4a2343e7ef48 9,12-14,26-31,34-42,45-58
+  s_c84f24b174d97c::t_36030607c33a1e 32-33
+Sources/CheppuCore/Dictation/Dictation.swift
+  s_c84f24b174d97c::t_b4e3520f5590f4 104-109,113-118
+  s_c84f24b174d97c::t_f13a75e9ee884b 75-78,82-84,86,88-97,99-103,110-112
+  s_c84f24b174d97c::t_a541d6d088d837 85,87,98
+  s_c84f24b174d97c::t_b00422dcbf233a 119
+Sources/CheppuInsertion/Focus.swift
+  s_c84f24b174d97c::t_27637a32419295 18-31,33-44,47-52,55-61,64,68-89,93
+  s_c84f24b174d97c::t_69c674c3da8d7e 98-101
+  s_c84f24b174d97c::t_3149c4b0f2b085 2,45,53-54,67,90-92,94-97,102-108
+Scripts/check-cleanup-is-a-pure-function.sh
+  s_c84f24b174d97c::t_b5093fece16e22 56-60,63-64
+  s_c84f24b174d97c::t_c344d610eb19f0 50-55,61-62,65-70
+Sources/CheppuInsertion/PasteInsertion.swift
+  s_c84f24b174d97c::t_8e56b14312b6b0 64-71
+Tests/CheppuCoreTests/TerminalTests.swift
+  s_c84f24b174d97c::t_d2e6f4ef065609 1-4,6-15,17-24,26-35,37-46,48-68,70-92
+  s_c84f24b174d97c::t_a541d6d088d837 5,16,25,36,47,69
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_c84f24b174d97c::t_a541d6d088d837 365
+  s_c84f24b174d97c::t_ba462d01f1e764 362-364,366,369
+Tests/CheppuInsertionTests/PasteInsertionTests.swift
+  s_c84f24b174d97c::t_d7f53a4f2bada0 121
+  s_c84f24b174d97c::t_ac2d0ca7c3c826 107-120,122-123
+  s_c84f24b174d97c::t_a62b6899ab2f13 13-15,17-18
+docs/adr/0008-terminals-are-found-by-what-a-text-surface-looks-like.md
+  s_c84f24b174d97c::t_766064f293df1f 1-4,6,8,10,12-16,18,20-22,28
+  s_c84f24b174d97c::t_471c3caa2d0a11 5,7,9,11,17,19,23-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "c24a4e13ea12cb8600ebe3653f2188d3a0fcaa42",
+  "prompts": {},
+  "sessions": {
+    "s_c84f24b174d97c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bdec7f6a-f9a0-445c-8fd6-a4263c520f48",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
