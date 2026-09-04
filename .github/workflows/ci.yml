@@ -45,6 +45,9 @@ jobs:
       - name: Cleanup is a pure function
         run: ./Scripts/check-cleanup-is-a-pure-function.sh
 
+      - name: History holds text only
+        run: ./Scripts/check-history-holds-text-only.sh
+
       # No Engine downloaded, no model, no microphone and nothing granted on
       # this runner: the suite has to be green all the same, which is the whole
       # point of the ports.

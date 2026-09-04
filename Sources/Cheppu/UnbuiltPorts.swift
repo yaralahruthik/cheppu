@@ -10,15 +10,6 @@ import CheppuEngine
 //
 // This is glue: it holds no decisions of its own, which is why it is not tested.
 
-/// History, until #13 builds it.
-///
-/// The Final Text reaches this on every path out of Transcribing and is
-/// dropped, so today a Dictation whose Insertion fails is a Dictation lost —
-/// which is exactly the promise #13 exists to keep.
-struct UnkeptHistory: HistoryPort {
-    func append(_ entry: HistoryEntry) async throws {}
-}
-
 /// The Engine, on a machine with nowhere to keep it.
 ///
 /// An account with no Application Support has nowhere for the Engine to live,

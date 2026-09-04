@@ -101,7 +101,7 @@ A short sound played when a Dictation starts, when it stops, and when it is Canc
 _Avoid_: beep, chime, sound effect
 
 **History**:
-The list of recent Final Texts kept on the machine so a Dictation is never lost. Holds text only, never audio.
+The list of recent Final Texts kept on the machine so a Dictation is never lost. Written before Insertion is attempted, so a Dictation whose Insertion failed is in it too. Holds Final Text and a timestamp only — never audio, never the Raw Transcript, and never which app the words went into — keeps the hundred most recent and drops the rest, and is emptied in one action (ADR-0009).
 _Avoid_: log, transcripts, recordings
 
 **Onboarding**:
