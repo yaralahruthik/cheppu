@@ -12,11 +12,22 @@ struct MenuBarMenuTests {
         #expect(MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items.contains(.quit))
     }
 
-    @Test("With the Hotkey working, the menu is the Cues and Quit")
-    func withTheHotkeyWorkingTheMenuIsTheCuesAndQuit() {
+    @Test("With the Hotkey working, the menu is History, the Cues and Quit")
+    func withTheHotkeyWorkingTheMenuIsHistoryTheCuesAndQuit() {
         #expect(
-            MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items == [.cues(areOn: true), .quit]
+            MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items
+                == [.history, .cues(areOn: true), .quit]
         )
+    }
+
+    @Test("History is opened from the menu bar")
+    func historyIsOpenedFromTheMenuBar() {
+        // The menu is the only way into History, because it is the only part of
+        // Cheppu the user can reach: there is no Dock icon and no window until
+        // one is asked for. Its title says it opens something rather than doing
+        // something, which is what the ellipsis means everywhere else on the
+        // machine.
+        #expect(MenuBarItem.history.title == "History\u{2026}")
     }
 
     @Test("The menu says which way the Cue switch is set")
@@ -44,7 +55,7 @@ struct MenuBarMenuTests {
         // they opened the menu.
         #expect(
             MenuBarMenu(canSeeTheHotkey: false, areCuesOn: true).items
-                == [.allowAccessibility, .cues(areOn: true), .quit]
+                == [.allowAccessibility, .history, .cues(areOn: true), .quit]
         )
         #expect(MenuBarItem.allowAccessibility.title.contains("Accessibility"))
     }
@@ -55,6 +66,7 @@ struct MenuBarMenuTests {
         // switch must not carry one.
         #expect(!MenuBarItem.quit.isTicked)
         #expect(!MenuBarItem.allowAccessibility.isTicked)
+        #expect(!MenuBarItem.history.isTicked)
     }
 
     @Test("An item with no shortcut claims no key")
@@ -62,5 +74,6 @@ struct MenuBarMenuTests {
         // Said rather than spelled as an empty string, so an item cannot
         // quietly take a shortcut the user needs.
         #expect(MenuBarItem.allowAccessibility.shortcutKey == nil)
+        #expect(MenuBarItem.history.shortcutKey == nil)
     }
 }

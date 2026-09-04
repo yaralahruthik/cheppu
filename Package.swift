@@ -58,6 +58,18 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // History: the one place Cheppu writes what was said to the disk, and
+        // the window the user reads it back in. A target of its own rather than
+        // part of the app so that the promises History makes — text and a
+        // timestamp and nothing else, a hundred Dictations and no more, a file
+        // nobody but its owner can open, and an emptying that leaves nothing
+        // behind — are testable against a real file in a temporary directory,
+        // with no menu bar launched and the user's own History never touched.
+        .target(
+            name: "CheppuHistory",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The Pill and the Cues: the one place Cheppu draws over another app's
         // window and the one place it makes a sound. A target of its own rather
         // than part of the app so that where the Pill goes so as not to cover
@@ -74,7 +86,7 @@ let package = Package(
             name: "Cheppu",
             dependencies: [
                 "CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard", "CheppuInsertion",
-                "CheppuFeedback",
+                "CheppuFeedback", "CheppuHistory",
             ]
         ),
 
@@ -101,6 +113,11 @@ let package = Package(
         .testTarget(
             name: "CheppuInsertionTests",
             dependencies: ["CheppuInsertion"]
+        ),
+
+        .testTarget(
+            name: "CheppuHistoryTests",
+            dependencies: ["CheppuHistory"]
         ),
 
         .testTarget(

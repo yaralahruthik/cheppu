@@ -1,0 +1,29 @@
+---
+status: accepted
+---
+
+# History is a file of its own, not a preference
+
+ADR-0004 says in passing that the `UserDefaults` suite under Cheppu's bundle identifier holds "Settings and History". Settings, yes — that is what a preference is for, and the Cue switch already lives there. History does not, and #13 keeps it somewhere else: one file, `~/Library/Application Support/Cheppu/History.jsonl`, one Dictation per line, `0600` in a `0700` folder.
+
+The two are different kinds of thing that happen to be written by the same app. A preference is a handful of switches the user set once. History is everything the user said this week, and the promises made about it — it survives a crash, nobody but its owner can read it, there are a hundred entries and no more, and one action empties it — are promises about a file. A preferences plist can be made to keep the entries, but it cannot be made to keep the promises:
+
+- **`cfprefsd` decides when it writes.** Preferences are cached in a daemon and flushed when it suits it. History exists precisely for the moment Cheppu dies between transcribing and inserting (`docs/product-experience.md` §4), and a store whose write may still be in another process's memory when the app is killed is not a store that survives being killed. A file Cheppu writes itself is on the disk when the call returns.
+- **Permissions are not a preference's to set.** A plist in `~/Library/Preferences` is created world-readable. Every other account on the machine could read a transcript of everything its owner has dictated, which is the one thing §10 is about. Cheppu sets `0600` on the file and `0700` on the folder, on every write, because writing atomically replaces the file and the replacement is only as private as the account's umask.
+- **A whole value is one syntax error away from no History at all.** One key holding an array of a hundred entries — or one JSON document — has to parse in full or it holds nothing. A bad block, a backup restored halfway, a copy that stopped: whatever damages the file takes the lines it landed on and leaves the rest readable. Cheppu writes the whole file atomically, so a write cut short is not the risk; what one Dictation per line buys is that damage is bounded to the Dictations it touched.
+- **It has to be findable and deletable by hand.** The Engine already lives under `Application Support/Cheppu/`. History next to it means everything Cheppu has put on the machine is in one folder the user can drag to the Trash, which is what makes "stored locally, cleared in one action" checkable rather than believed.
+- **Application Support is not synced.** Documents and Desktop are copied off the machine by iCloud Drive. `Application Support` in the user's own domain is not, and is not shared with a second account.
+
+JSON Lines rather than a database: the file is at most a hundred short records, and the format has to be one a suspicious user can read with `cat` and delete with `rm`. A store that needed a tool to inspect would be asking to be trusted rather than showing what it holds.
+
+The store keeps no more than the core says it may, so the bound is enforced on the disk and not only in what the window is handed: the file is rewritten from `History` on every append, which for a hundred short lines costs less than the Insertion that follows it.
+
+## Consequences
+
+- ADR-0004's list of what keys off the bundle identifier still holds for Settings and the Cue switch. History does not key off it: it is found by path, under `Cheppu/`, which is a folder the user can name.
+- The order entries come back in and the bound on how many there are belong to `History` in the core, not to the store. `HistoryStore` writes what the core hands it, so both are testable without a file and neither can be answered twice.
+- The store keeps what it has read in memory, because a Dictation writes History before it inserts and that write is on the path between the user finishing a sentence and the words appearing (§7). Re-reading a hundred lines to add one to them would put a disk read on every Dictation for nothing.
+- The permissions are set on every write, both of them. Writing atomically means writing a new file and moving it into place, so the file's `0600` cannot be set once; and `createDirectory` ignores the attributes it is handed for a folder that already exists, which on a real machine `Cheppu/` nearly always does — the Engine Download makes it during Onboarding, before anybody has dictated anything. So History closes the folder it found rather than the one it thinks it made, which also tightens the Engine's `0755` to `0700`.
+- Clearing removes the file rather than emptying it, and only once the file is actually gone. A file holding the shape of what the user asked to be forgotten is still keeping something.
+- A History that will not take the words takes the Dictation with it, for now. `DictationCore` stops carrying out a Dictation's effects at the first port that throws, and History is written before the Insertion is attempted — which is the whole promise. So a full disk costs the user the Insertion as well as the record, which is the one shape of failure History exists to prevent. The ordering is not what changes: which failures may end a Dictation, and what the user is told about one, is #14's, and this is the case that makes it worth answering. Until then a store that cannot write says so rather than reporting a success it did not have.
+- `Scripts/check-history-holds-text-only.sh` fails the build if the target that writes History ever names a Dictation's audio, its Raw Transcript or the Target App, if it reaches for a shared or synced folder, or if the permissions stop being set on every write. The promise is structural rather than reviewed, like the network and the audio promises before it.

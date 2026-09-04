@@ -3,6 +3,7 @@ import CheppuAudio
 import CheppuCore
 import CheppuEngine
 import CheppuFeedback
+import CheppuHistory
 import CheppuInsertion
 import CheppuKeyboard
 
@@ -21,6 +22,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// the app: the Hotkey watch reports to it weakly, so a core nobody keeps
     /// is a Hotkey that does nothing.
     private var dictations: DictationCore?
+
+    /// Everything Cheppu still has of what the user said, and the window they
+    /// read it in. Held here rather than made when the menu item is picked, so
+    /// that the Dictation writing to History and the window reading it are the
+    /// same store.
+    private let history = HistoryStore()
+    private lazy var historyWindow = HistoryWindow(reading: history)
 
     /// Whether the Hotkey is being watched. Everything the menu says about
     /// Accessibility hangs off this.
@@ -70,7 +78,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             engine: engine,
             insertion: PasteInsertion(),
             clipboard: SystemClipboard(),
-            history: UnkeptHistory(),
+            history: history,
             feedback: PillAndCues(),
             clock: SystemClock()
         )
@@ -152,6 +160,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         switch item {
         case .allowAccessibility:
             AccessibilityRequest.ask()
+        case .history:
+            historyWindow.show()
         case .cues(let areOn):
             cues.turnCues(on: !areOn)
             showMenu()
