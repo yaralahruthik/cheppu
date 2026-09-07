@@ -1,0 +1,107 @@
+Sources/CheppuSettings/Preferences.swift
+  s_70663f163777ed::t_5d8c8148367150 21,31,56-76
+  s_70663f163777ed::t_f0cda4ad0238bc 77
+Tests/CheppuSettingsTests/SystemSettingsPaneTests.swift
+  s_70663f163777ed::t_63571580204d0f 19
+Sources/CheppuCore/Hotkey/Hotkey.swift
+  s_70663f163777ed::t_8aed7660aed507 1-171
+Tests/CheppuSettingsTests/PreferencesTests.swift
+  s_70663f163777ed::t_5d8c8148367150 20-68
+Sources/CheppuSettings/SystemSettingsPane.swift
+  s_70663f163777ed::t_63571580204d0f 22-24,40-49
+Sources/CheppuCore/Hotkey/HotkeyFailure.swift
+  s_70663f163777ed::t_98119063281922 17-23
+Tests/CheppuKeyboardTests/Fakes/FakeKeyboard.swift
+  s_70663f163777ed::t_abe0532ec33bb2 112,114-128
+  s_70663f163777ed::t_e3c68d1bd97271 20,29,33,51-54,81-111
+  s_70663f163777ed::t_2e87d506cb7161 113
+Sources/CheppuCore/MenuBarMenu.swift
+  s_70663f163777ed::t_111dc087c818cb 7-12,45,61,78,92-96,98,100
+Sources/CheppuCore/Hotkey/HotkeyRecording.swift
+  s_70663f163777ed::t_7eee67c3d38271 1-62
+Sources/CheppuKeyboard/HotkeyGesture.swift
+  s_70663f163777ed::t_8b2f92ff4d67ff 18-20,22-28,30,33-34,37-40,43-70,72-76,79-83,97,104-141
+Sources/CheppuSettings/HotkeyRecorder.swift
+  s_70663f163777ed::t_9c757f6f884954 74-79,86
+  s_70663f163777ed::t_cfb83d23635c7d 69-70
+  s_70663f163777ed::t_1349160fddbf00 1-68,71-73,80-85,87-96
+Sources/CheppuCore/Ports/Ports.swift
+  s_70663f163777ed::t_98119063281922 58-67
+Sources/CheppuCore/Hotkey/HotkeyWarning.swift
+  s_70663f163777ed::t_8aed7660aed507 1-39,44-46
+  s_70663f163777ed::t_cfb83d23635c7d 40-43
+Sources/CheppuCore/Hotkey/Key.swift
+  s_70663f163777ed::t_43ea7bc9896ed4 1-54
+Sources/CheppuCore/Hotkey/Modifier.swift
+  s_70663f163777ed::t_cbfae39e898be2 1-98
+docs/adr/0011-one-question-of-a-key-and-only-the-one-the-user-chose.md
+  s_70663f163777ed::t_a6dba7fefa5a85 1-28
+Sources/Cheppu/MenuBarController.swift
+  s_70663f163777ed::t_04ac899ad7a983 142,145,175-179,182
+  s_70663f163777ed::t_c9abd1b4656abc 139-141,143-144,149,153-156,160,168-174,180-181,183-184,188
+  s_70663f163777ed::t_94e0682e006be4 27-31,39-43,59-63,100-102,224-225
+Tests/CheppuCoreTests/HotkeyRecordingTests.swift
+  s_70663f163777ed::t_cfb83d23635c7d 30-33,69-71
+  s_70663f163777ed::t_a0eb1e37b3c945 1-29,34-63,66,72-96
+  s_70663f163777ed::t_65fb200287e4d3 64-65,67-68
+Sources/CheppuCore/Settings/SettingsScreen.swift
+  s_70663f163777ed::t_8c4fe9fd80f011 96-97,103,127,147-148,169-180,183-184,197-198,248-252,262,282
+  s_70663f163777ed::t_f0a0c555bd5cda 22-27,36-50,57,66
+  s_70663f163777ed::t_7cd112420da9f3 98-102,149-153,181-182,199-201,244-247,263,270-273
+Tests/CheppuCoreTests/MenuBarMenuTests.swift
+  s_70663f163777ed::t_111dc087c818cb 12,18,68-83,92,101
+Sources/Cheppu/PermissionRequest.swift
+  s_70663f163777ed::t_cfb83d23635c7d 45-46,52-55
+  s_70663f163777ed::t_6752d43e1b9f41 1-44,47-51,56-60
+Tests/CheppuCoreTests/HotkeyTests.swift
+  s_70663f163777ed::t_e86f561047de36 146-147,149-151
+  s_70663f163777ed::t_ee94cb49900f7b 1-53,57-96,99-107,109-145,148,152-157
+  s_70663f163777ed::t_77954c4b2a61d5 97-98,108
+  s_70663f163777ed::t_cfb83d23635c7d 54-56
+Tests/CheppuKeyboardTests/HotkeyGestureTests.swift
+  s_70663f163777ed::t_164573573bb3fd 148-264
+  s_70663f163777ed::t_5f553d5b88ebc7 14-20
+Tests/CheppuKeyboardTests/HotkeyWatchTests.swift
+  s_70663f163777ed::t_abe0532ec33bb2 14-16,18-23,85-206
+  s_70663f163777ed::t_6ef5be28da45de 207
+Sources/Cheppu/SystemPermissions.swift
+  s_70663f163777ed::t_6752d43e1b9f41 6-7,11-14,24,29-38
+  s_70663f163777ed::t_39d42935dc8708 39
+Sources/CheppuKeyboard/HotkeyWatch.swift
+  s_70663f163777ed::t_98119063281922 8-16,19,21,27-34,37-39,41-46,48,50,54-55,62-68,81-84,95
+README.md
+  s_70663f163777ed::t_1f5edcaf4090c7 36-37,62,69
+Tests/CheppuCoreTests/SettingsScreenTests.swift
+  s_70663f163777ed::t_645be6972a7637 30-37,116
+  s_70663f163777ed::t_cfb83d23635c7d 111-113,117-119,127-129
+  s_70663f163777ed::t_8a16f2548262d5 11,21,40-42,75-84,101-110,114-115,120-126,130-131,213
+  s_70663f163777ed::t_7cd112420da9f3 12,22,47,85-100
+Sources/CheppuKeyboard/Keyboard.swift
+  s_70663f163777ed::t_df1c4fed3ee00c 5,10,12-13,20-29,32-33,48-54,68-80,101-111,114,120,124-127,150-152,186,203,205-211,231-250,256,259-264,289-322
+  s_70663f163777ed::t_cfb83d23635c7d 212-215
+Tests/CheppuKeyboardTests/ModifierKeysTests.swift
+  s_70663f163777ed::t_5f553d5b88ebc7 1,7-10,22-23
+Sources/CheppuSettings/SettingsWindow.swift
+  s_70663f163777ed::t_ebb8f63a6cd74b 24,103-106,152-155,300-305
+  s_70663f163777ed::t_2f0fa43cc6a309 38-46,63-64,71,163,165-166,170,220,247,275-276,289-299,306-350
+CONTEXT.md
+  s_70663f163777ed::t_2cb0f27806e0a8 30,33-40,120
+Scripts/check-cheppu-tells-one-key-apart.sh
+  s_70663f163777ed::t_aedbd7958933f0 3-10,18-25,27,29-31,34,38-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "6a563994e4f48b3a2f1343d01b0e57a555d43832",
+  "prompts": {},
+  "sessions": {
+    "s_70663f163777ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17267fb3-06eb-4d69-9551-0ea375e97c86",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
