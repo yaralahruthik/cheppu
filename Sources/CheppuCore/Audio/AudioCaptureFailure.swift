@@ -20,4 +20,22 @@ public enum AudioCaptureFailure: Error, Equatable {
     /// rather than the user's, and said out loud rather than answered with an
     /// empty Dictation, which would look like a Dictation that heard nothing.
     case notCapturing
+
+    /// The permission standing in the way, where one is — which is what the app
+    /// has to name and which pane it has to open.
+    ///
+    /// Here rather than in the app, exactly as `HotkeyFailure.permission` is, so
+    /// that the sentence a user reads and the pane a button opens are chosen
+    /// from the same answer.
+    ///
+    /// Nothing, for the two failures a System Settings pane cannot fix. A
+    /// microphone that is not attached is not the user refusing Cheppu
+    /// something, and sending them off to grant a permission they already have
+    /// would be Cheppu blaming them for an unplugged cable.
+    public var permission: Permission? {
+        switch self {
+        case .accessDenied: .microphone
+        case .noMicrophone, .notCapturing: nil
+        }
+    }
 }

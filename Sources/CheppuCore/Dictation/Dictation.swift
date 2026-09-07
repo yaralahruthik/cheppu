@@ -158,7 +158,9 @@ public struct InputLevel: Equatable, Sendable {
 ///
 /// The two states the user has to be able to tell apart without looking
 /// carefully — it is hearing me, and it is working on what it heard — and the
-/// one thing it ever has to say in words.
+/// two things it ever has to say in words: where the words went when they could
+/// not be typed, and which permission is missing when a Dictation could not run
+/// at all.
 ///
 /// Listening carries the level rather than sitting next to it. A Pill that says
 /// "listening" and nothing else answers the wrong question — the user wants to
@@ -171,11 +173,40 @@ public enum PillState: Equatable, Sendable {
     /// The Clipboard Fallback: the words could not be typed, so they are on the
     /// clipboard and the user is the one who puts them where they were going.
     ///
-    /// The only state the Pill has to say rather than draw. "Done" is signalled
-    /// by the text appearing (`docs/product-experience.md` §3), and this is the
-    /// state where it did not: a shape the user had to learn would be a
-    /// Dictation that looked like it had worked.
+    /// One of the two states the Pill says rather than draws. "Done" is
+    /// signalled by the text appearing (`docs/product-experience.md` §3), and
+    /// this is the state where it did not: a shape the user had to learn would
+    /// be a Dictation that looked like it had worked.
     case onTheClipboard
+
+    /// A Dictation that could not run, because macOS is no longer letting
+    /// Cheppu do the thing it needs this permission for.
+    ///
+    /// The other state the Pill says rather than draws, and for the same
+    /// reason: there is no shape that means "your Microphone is switched off",
+    /// and a Pill that flashed and went would be the silence
+    /// `docs/product-experience.md` §9 rules out. It names the permission,
+    /// because which one it is decides where the user has to go.
+    case permissionMissing(Permission)
+
+    /// What the Pill writes, where this is a state it writes rather than draws.
+    ///
+    /// Decided here rather than by whatever is drawing, so that the words a
+    /// user reads on the Pill and the pane a button opens about the same
+    /// moment are chosen from the same answer. Nothing, for the two states a
+    /// running Dictation is in: "can it hear me?" and "is it working?" are
+    /// answered faster by a shape than by a word.
+    public var words: String? {
+        switch self {
+        case .listening, .transcribing: nil
+        // Where the words are, and never why they are there: what the user does
+        // next is paste, whichever way the Insertion failed.
+        case .onTheClipboard: "On the clipboard"
+        // By the name macOS calls it, so that the name on the Pill is the name
+        // on the pane Cheppu sends them to.
+        case .permissionMissing(let permission): "Cheppu needs \(permission.name)"
+        }
+    }
 }
 
 /// A short sound marking the edge of a Dictation, so one can be run by feel.

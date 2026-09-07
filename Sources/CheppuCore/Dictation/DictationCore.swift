@@ -26,6 +26,7 @@ public actor DictationCore {
     private let clipboard: any ClipboardPort
     private let history: any HistoryPort
     private let feedback: any FeedbackPort
+    private let permissions: any PermissionPort
     private let clock: any ClockPort
 
     /// When the Hotkey went down, as the Clock read it.
@@ -48,6 +49,7 @@ public actor DictationCore {
         clipboard: any ClipboardPort,
         history: any HistoryPort,
         feedback: any FeedbackPort,
+        permissions: any PermissionPort,
         clock: any ClockPort
     ) {
         self.machine = DictationMachine()
@@ -59,6 +61,7 @@ public actor DictationCore {
         self.clipboard = clipboard
         self.history = history
         self.feedback = feedback
+        self.permissions = permissions
         self.clock = clock
     }
 
@@ -140,10 +143,11 @@ public actor DictationCore {
     /// waits its turn rather than interleaving with it, and returns once queued.
     ///
     /// A port that throws ends that Dictation: the Pill comes down, the machine
-    /// returns to Idle, and the error is passed on. The Insertion is the one
-    /// exception, and it is the reason the rest can be this blunt — an
-    /// Insertion that did not land is answered rather than thrown, with the
-    /// words on the clipboard and the Pill saying so.
+    /// returns to Idle, and the error is passed on — unless the refusal was a
+    /// permission, in which case the Pill says which one and stays up to be read
+    /// (#17). The Insertion is the one exception, and it is the reason the rest
+    /// can be this blunt — an Insertion that did not land is answered rather
+    /// than thrown, with the words on the clipboard and the Pill saying so.
     public func receive(_ event: DictationEvent) async throws {
         queued.append(event)
         guard !isDraining else { return }
@@ -161,15 +165,39 @@ public actor DictationCore {
             }
         } catch {
             queued.removeAll()
-            // Nothing on the way back to Idle can fail — the Pill only has to
-            // come down — but a second failure while unwinding the first has
-            // nowhere useful to go, and losing the app to it would be worse than
-            // losing the Dictation.
-            for effect in machine.receive(.dictationFailed) {
+            // Nothing on the way back to Idle can fail — the Pill has to come
+            // down, or say which permission is missing and stay up — but a
+            // second failure while unwinding the first has nowhere useful to go,
+            // and losing the app to it would be worse than losing the
+            // Dictation.
+            for effect in machine.receive(whatEnded(by: error)) {
                 _ = try? await perform(effect)
             }
             throw error
         }
+    }
+
+    /// What a failure means to the Dictation it ended.
+    ///
+    /// A refusal the user can undo is named, because saying which permission it
+    /// was and putting them in front of the switch is the difference between a
+    /// Dictation that failed and one that failed quietly
+    /// (`docs/product-experience.md` §9). Everything else is a Dictation that
+    /// ended, and there is nothing to say about it that the user could act on.
+    ///
+    /// The failure is asked rather than the port, because a permission taken
+    /// away is not a port going wrong: it is the same port answering the way it
+    /// always does, with the one answer macOS will change its mind about.
+    ///
+    /// Only the microphone is asked. It is the one port a Dictation can be
+    /// refused by: the keyboard is asked for once, by `watchForActivations()`,
+    /// which is not on this path and where a refusal is the app's to say rather
+    /// than a Dictation's — there is no Dictation to put a Pill up for.
+    private func whatEnded(by error: Error) -> DictationEvent {
+        guard let permission = (error as? AudioCaptureFailure)?.permission else {
+            return .dictationFailed
+        }
+        return .permissionMissing(permission)
     }
 
     /// Takes the Cap from the Clock, five minutes into a Dictation.
@@ -286,6 +314,10 @@ public actor DictationCore {
 
         case .leaveOnTheClipboard(let finalText):
             await clipboard.leave(finalText)
+            return nil
+
+        case .askFor(let permission):
+            await permissions.askFor(permission)
             return nil
 
         case .leaveTheNoticeUp:

@@ -77,8 +77,26 @@ actor FakeCleanupSwitches: CleanupSwitches {
 
 /// Audio capture that hands back canned audio without a microphone.
 struct FakeAudioCapture: AudioCapturePort {
+    /// What this microphone does when a Dictation asks it to open.
+    ///
+    /// The two refusals are here rather than one because they are answered
+    /// differently: a grant taken away is something the user can give back, and
+    /// a device that is not there is not.
+    enum Outcome: Sendable {
+        /// It opens, and reports whatever it was told it would hear.
+        case opens
+
+        /// Microphone access was refused, or granted once and taken away since.
+        case findsTheMicrophoneTakenAway
+
+        /// There is no input device to open — none attached, or the one that
+        /// was there has gone.
+        case findsNoMicrophone
+    }
+
     let journal: PortJournal
     let captured: CapturedAudio
+    var outcome: Outcome = .opens
 
     /// What this microphone hears the moment capture opens. A real one reports
     /// as the buffers arrive; reporting them all at once is the same thing to
@@ -89,6 +107,15 @@ struct FakeAudioCapture: AudioCapturePort {
     func startCapturing(reporting report: @escaping @Sendable (InputLevel) async -> Void)
         async throws
     {
+        // Refused before anything is written down: a microphone that would not
+        // open is one that captured nothing, and a journal saying otherwise
+        // would be a Dictation that looked like it had heard something.
+        switch outcome {
+        case .opens: break
+        case .findsTheMicrophoneTakenAway: throw AudioCaptureFailure.accessDenied
+        case .findsNoMicrophone: throw AudioCaptureFailure.noMicrophone
+        }
+
         await journal.record(.capturingStarted)
         for level in hearsLevels {
             await report(level)
@@ -269,6 +296,19 @@ struct FakeHistory: HistoryPort {
     func append(_ entry: HistoryEntry) async throws {
         guard !refuses else { throw Refused() }
         await journal.record(.appendedToHistory(entry))
+    }
+}
+
+/// Cheppu saying which permission it does not have.
+///
+/// A real one puts an alert on the screen and opens a System Settings pane;
+/// this one writes down which permission was named, which is the whole of what
+/// the core decided.
+struct FakePermissions: PermissionPort {
+    let journal: PortJournal
+
+    func askFor(_ permission: Permission) async {
+        await journal.record(.askedFor(permission))
     }
 }
 

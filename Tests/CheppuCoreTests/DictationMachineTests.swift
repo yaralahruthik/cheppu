@@ -880,4 +880,83 @@ struct DictationMachineTests {
         // The Pill on screen belongs to the Dictation that is listening now.
         #expect(machine.receive(.noticeRead).isEmpty)
     }
+
+    // MARK: - A permission that is missing
+
+    @Test("A Dictation that meets a missing permission says which one, rather than ending in silence")
+    func aDictationThatMeetsAMissingPermissionSaysWhichOne() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+
+        // The microphone never opened, so there is nothing to stop capturing
+        // and nothing for the Cap to be counting for. What is left is telling
+        // the user why the key they pressed did nothing: the Pill names the
+        // permission and stays up to be read, and Cheppu asks for it — which is
+        // what puts them in front of the pane it is granted on
+        // (`docs/product-experience.md` §9).
+        #expect(
+            machine.receive(.permissionMissing(.microphone)) == [
+                .stopTheCap,
+                .showPill(.permissionMissing(.microphone)),
+                .leaveTheNoticeUp,
+                .askFor(.microphone),
+            ])
+    }
+
+    @Test("The permission that is named is the one that is missing")
+    func thePermissionThatIsNamedIsTheOneThatIsMissing() {
+        // Three permissions, three panes, three sentences. A user sent to the
+        // Accessibility pane because their Microphone is off would grant
+        // something they already had and come back to a Dictation that still
+        // hears nothing.
+        for permission in Permission.allCases {
+            var machine = DictationMachine()
+            _ = machine.receive(.hotkeyPressed)
+
+            let said = machine.receive(.permissionMissing(permission))
+            #expect(said.contains(.showPill(.permissionMissing(permission))))
+            #expect(said.contains(.askFor(permission)))
+        }
+    }
+
+    @Test("The notice naming a missing permission stays up long enough to be read")
+    func theNoticeNamingAMissingPermissionStaysUpLongEnoughToBeRead() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+
+        // The Pill is the whole of what the user sees, so it cannot come down
+        // in the same breath as it goes up — exactly as the Clipboard
+        // Fallback's notice does not.
+        let said = machine.receive(.permissionMissing(.microphone))
+        #expect(!said.contains(.hidePill))
+        #expect(machine.receive(.noticeRead) == [.hidePill])
+    }
+
+    @Test("A Dictation stopped by a missing permission leaves Cheppu ready for the next one")
+    func aDictationStoppedByAMissingPermissionLeavesCheppuReadyForTheNextOne() {
+        var machine = DictationMachine()
+        _ = machine.receive(.hotkeyPressed)
+        _ = machine.receive(.permissionMissing(.microphone))
+
+        // Granting it back and pressing the key again is the whole of the way
+        // out: a Dictation that could not run costs the user that Dictation and
+        // not the app.
+        #expect(machine.receive(.hotkeyPressed) == openingADictation)
+    }
+
+    @Test("A permission found missing after the Dictation has stopped is still said out loud")
+    func aPermissionFoundMissingAfterTheDictationHasStoppedIsStillSaidOutLoud() {
+        var machine = DictationMachine()
+        hold(&machine)
+
+        // Nothing is left counting once a Dictation has stopped Listening, so
+        // there is no Cap to call off. What the user is told is the same: which
+        // permission is in the way, and the way to it.
+        #expect(
+            machine.receive(.permissionMissing(.accessibility)) == [
+                .showPill(.permissionMissing(.accessibility)),
+                .leaveTheNoticeUp,
+                .askFor(.accessibility),
+            ])
+    }
 }

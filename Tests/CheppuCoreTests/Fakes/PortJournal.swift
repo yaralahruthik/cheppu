@@ -20,6 +20,10 @@ actor PortJournal {
         case appendedToHistory(HistoryEntry)
         case inserted(FinalText, into: TargetApp)
         case leftOnTheClipboard(FinalText)
+
+        /// Cheppu named a permission it does not have and offered the way to
+        /// the pane it is granted on.
+        case askedFor(Permission)
     }
 
     private(set) var calls: [Call] = []

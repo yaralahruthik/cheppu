@@ -16,8 +16,14 @@ import CheppuSettings
 /// for itself — fetching the Engine at launch, with nothing shown — is a
 /// placeholder that Onboarding takes over (#20). That is why it is not tested.
 @MainActor
-final class MenuBarController: NSObject, NSApplicationDelegate {
+final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
+
+    /// The menu behind the icon. One menu for the life of the app, filled again
+    /// every time it is opened: what it offers depends on which permissions
+    /// macOS says Cheppu has this instant, and nothing tells an app when one is
+    /// taken away (ADR-0010).
+    private let menu = NSMenu()
 
     /// The Dictation, and every port it is wired to. Held here for the life of
     /// the app: the Hotkey watch reports to it weakly, so a core nobody keeps
@@ -50,13 +56,23 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// reading the same preferences domain, so none of them can come to
     /// disagree with what a Dictation actually does (ADR-0010).
     private let preferences = Preferences()
+
+    /// What macOS says about each permission, asked afresh every time. One
+    /// answer for the whole app, so the menu, the Settings window and the
+    /// Dictation that met a refusal cannot come to disagree about what Cheppu
+    /// has.
+    private let permissions = SystemPermissions()
+
+    /// Saying which permission is missing, and offering the way to the pane it
+    /// is granted on. The Dictation that meets the refusal asks for it, and so
+    /// does the watch when it finds it may no longer read the keyboard.
+    private lazy var sayingWhatIsMissing = SayingWhatIsMissing(
+        setting: preferences, asking: permissions)
+
     private lazy var settingsWindow = SettingsWindow(
         setting: preferences,
-        asking: SystemPermissions(),
+        asking: permissions,
         clearingHistory: { [weak self] in self?.emptyHistory() },
-        // The Cue switch is in two places at once. Redrawing the menu is what
-        // keeps the tick in it saying what the window just did.
-        whenTheCuesMove: { [weak self] in self?.showMenu() },
         // A Hotkey chosen in the window is watched for by the next press, with
         // no relaunch: the watch reads the key where it uses it, so all that is
         // needed is to watch again (ADR-0010).
@@ -69,11 +85,31 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// again is a Hotkey that only starts working at the next launch.
     private static let whileWaitingForAccessibility: Duration = .seconds(2)
 
+    /// How long to leave between asking macOS whether Cheppu may *still* watch
+    /// the keyboard.
+    ///
+    /// The same question, asked from the other side of it. Nothing tells an app
+    /// when a grant is taken away either, and a tap macOS has stopped handing
+    /// keys to is indistinguishable from a user who has not pressed anything —
+    /// which is exactly the silence #17 rules out.
+    ///
+    /// Longer than the wait above, because it is the one Cheppu spends its whole
+    /// life in: waiting for a permission is a minute of somebody's day, and
+    /// watching is the rest of it. Five seconds is still inside the moment the
+    /// user is in — they press the key, nothing happens, and Cheppu says why
+    /// before they have finished wondering — and it is a decision already on
+    /// record being read rather than a prompt being shown.
+    private static let whileWatchingTheKeyboard: Duration = .seconds(5)
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = MenuBarIcon.image()
+        // Filled as it opens rather than now and again afterwards: what it says
+        // depends on permissions that can be taken away while Cheppu is running
+        // and while nobody is looking at the menu.
+        menu.delegate = self
+        statusItem.menu = menu
         self.statusItem = statusItem
-        showMenu()
 
         runDictations()
     }
@@ -106,6 +142,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             clipboard: SystemClipboard(),
             history: history,
             feedback: PillAndCues(when: preferences),
+            permissions: sayingWhatIsMissing,
             clock: SystemClock()
         )
         self.dictations = dictations
@@ -132,23 +169,35 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Starts watching for the Hotkey, and says why it cannot if it cannot.
+    /// Starts watching for the Hotkey, says why it cannot if it cannot, and
+    /// keeps watching that it still may.
     ///
-    /// The reason is given once, when Cheppu first finds it cannot watch; the
-    /// menu goes on saying it for as long as it is true, because a user whose
-    /// Hotkey does nothing has nowhere else to look. Which reason it is depends
-    /// on the key they chose: every Hotkey needs Accessibility, and the Globe
-    /// key needs Input Monitoring on top of it.
+    /// The reason is given when Cheppu first finds it cannot watch; the menu
+    /// goes on saying it for as long as it is true, because a user whose Hotkey
+    /// does nothing has nowhere else to look. Which reason it is depends on the
+    /// key they chose: every Hotkey needs Accessibility, and the Globe key needs
+    /// Input Monitoring on top of it.
+    ///
+    /// It does not stop once it is watching. A grant can be taken away while
+    /// Cheppu is running, and macOS tells nobody when that happens — the tap
+    /// simply stops being handed keys, which from inside the app is
+    /// indistinguishable from a user who has not pressed anything. So the loop
+    /// keeps asking, and the moment the answer changes it goes round again and
+    /// meets the same refusal the first launch would have (#17).
     private func watchForTheHotkey(with dictations: DictationCore, sayingWhy: Bool = true) {
         watching?.cancel()
         watching = Task { [weak self] in
-            var hasSaidWhy = !sayingWhy
+            // Said the first time round unless the user is being shown a Hotkey
+            // they have just chosen, and said again after any watch that
+            // worked: a permission granted and then taken away a month later is
+            // worth exactly the same sentence it was worth the first time.
+            var sayWhy = sayingWhy
             while let self, !Task.isCancelled {
                 do {
                     try await dictations.watchForActivations()
                     missingForTheHotkey = nil
-                    showMenu()
-                    return
+                    sayWhy = true
+                    await untilTheKeyboardIsTakenAway()
                 } catch {
                     // A failure Cheppu has no name for is answered as the one
                     // it does: without Accessibility no Hotkey works at all, so
@@ -156,15 +205,28 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                     // nothing.
                     let missing = (error as? HotkeyFailure)?.permission ?? .accessibility
                     missingForTheHotkey = missing
-                    showMenu()
-                    if !hasSaidWhy {
-                        hasSaidWhy = true
-                        PermissionRequest.ask(for: missing, toWatch: preferences.hotkey())
-                    }
+                    if sayWhy { await sayingWhatIsMissing.askFor(missing) }
                     try? await Task.sleep(for: Self.whileWaitingForAccessibility)
                 }
             }
         }
+    }
+
+    /// Returns once macOS stops saying Cheppu may watch the keyboard.
+    ///
+    /// The Microphone is deliberately not asked about: it is what a Dictation
+    /// needs once the key has arrived, and a microphone switched off must not be
+    /// what tears down a tap that is working. The Dictation that meets that
+    /// refusal is what says so, which is where the user is when it matters.
+    private func untilTheKeyboardIsTakenAway() async {
+        while !Task.isCancelled, mayStillWatchTheKeyboard() {
+            try? await Task.sleep(for: Self.whileWatchingTheKeyboard)
+        }
+    }
+
+    private func mayStillWatchTheKeyboard() -> Bool {
+        Permission.neededToWatch(preferences.hotkey())
+            .allSatisfy { permissions.status(of: $0) == .granted }
     }
 
     /// Watches again, for the Hotkey the user has just chosen.
@@ -184,15 +246,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         watchForTheHotkey(with: dictations, sayingWhy: false)
     }
 
-    private func showMenu() {
-        statusItem?.menu = menu(
-            for: MenuBarMenu(
-                missingForTheHotkey: missingForTheHotkey, areCuesOn: preferences.areCuesOn()))
-    }
+    /// Fills the menu as it opens, from what is true this instant.
+    ///
+    /// Everything on it can move while nobody is looking at it — the Cue switch
+    /// from the Settings window, and a permission from System Settings — and
+    /// this is what makes the menu the one place that cannot be out of date
+    /// about them.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
 
-    private func menu(for menuBarMenu: MenuBarMenu) -> NSMenu {
-        let menu = NSMenu()
-        for item in menuBarMenu.items {
+        let showing = MenuBarMenu(
+            missing: missingPermissions(), areCuesOn: preferences.areCuesOn())
+        for item in showing.items {
             let menuItem = NSMenuItem(
                 title: item.title,
                 action: #selector(menuBarItemPicked(_:)),
@@ -203,7 +268,28 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             menuItem.state = item.isTicked ? .on : .off
             menu.addItem(menuItem)
         }
-        return menu
+    }
+
+    /// Every permission Cheppu is missing this instant, in the order Settings
+    /// reads them.
+    ///
+    /// What macOS says, asked afresh, so that the menu and the Settings window
+    /// cannot disagree about what Cheppu has — and, where the watch found
+    /// something in its way that macOS says is granted, that too. That is not a
+    /// copy of a decision kept in step with macOS (ADR-0010): it is the record
+    /// of what actually happened when Cheppu last tried to watch the keyboard,
+    /// which is a thing macOS has no answer for and which outranks the one on
+    /// record when the two differ.
+    ///
+    /// A permission nobody has answered for yet counts as missing, exactly as it
+    /// does in Settings, so a fresh install says it needs the Microphone before
+    /// any Dictation has asked for it. Offering the pane is not asking for the
+    /// permission (`docs/product-experience.md` §9), and Onboarding is what
+    /// makes the first run a sequence rather than a menu to read (#20).
+    private func missingPermissions() -> [Permission] {
+        Permission.neededBy(preferences.hotkey()).filter {
+            permissions.status(of: $0) == .notGranted || $0 == missingForTheHotkey
+        }
     }
 
     /// Empties History, from the button in the Settings window.
@@ -224,6 +310,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard let item = sender.representedObject as? MenuBarItem else { return }
         switch item {
         case .allowPermission(let permission):
+            // Asked for directly rather than through `SayingWhatIsMissing`,
+            // which is what keeps Cheppu from saying the same thing twice
+            // unasked. This one was asked for: the user picked the item.
             PermissionRequest.ask(for: permission, toWatch: preferences.hotkey())
         case .history:
             historyWindow.show()
@@ -231,9 +320,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             settingsWindow.show()
         case .cues(let areOn):
             preferences.turnCues(on: !areOn)
-            showMenu()
             // The same switch is a line in the Settings window, which may be
-            // open behind the menu.
+            // open behind the menu. The menu itself needs nothing: it is filled
+            // again the next time it is opened.
             settingsWindow.redrawIfShowing()
         case .quit:
             NSApp.terminate(nil)

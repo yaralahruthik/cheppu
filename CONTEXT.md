@@ -97,7 +97,7 @@ _Avoid_: shell, console, command line
 ### Feedback and memory
 
 **Pill**:
-The small floating overlay that appears during a Dictation and shows its state and the live input level. It draws the two states a Dictation is in while it runs and says the one it can end in — the Clipboard Fallback — in words, staying up long enough to be read before it goes.
+The small floating overlay that appears during a Dictation and shows its state and the live input level. It draws the two states a Dictation is in while it runs and says the two it can end in — the Clipboard Fallback, and a Missing Permission — in words, staying up long enough to be read before it goes.
 _Avoid_: HUD, overlay, indicator, widget
 
 **Input Level**:
@@ -109,8 +109,12 @@ A short sound played when a Dictation starts, when it stops, and when it is Canc
 _Avoid_: beep, chime, sound effect
 
 **Notice**:
-What the Pill says in words when a Dictation ends in a Clipboard Fallback: that the words are on the clipboard. The only thing the Pill ever writes rather than draws, and the only one it stays up for after a Dictation is over — long enough to be read, and then gone. It says where the words are and never why they are there: what the user does next is paste, whichever way the Insertion failed.
+What the Pill says in words rather than draws, and what it stays up for after a Dictation is over — long enough to be read, and then gone. There are two. A Clipboard Fallback's says the words are on the clipboard, and says where they are and never why they are there: what the user does next is paste, whichever way the Insertion failed. A Missing Permission's names the permission, because which one it is *is* what the user does next.
 _Avoid_: toast, alert, banner, message
+
+**Missing Permission**:
+A permission Cheppu needs that macOS does not currently grant — never answered for, refused, or granted once and taken away since. Never met in silence: the Dictation that meets one ends with the Pill naming it in a Notice, Cheppu says why in one line and offers the pane it is granted on, and the menu bar goes on offering that pane for as long as it is missing. Which permission it is is the whole of what the user can act on, so it is carried from the refusal to the sentence they read to the pane a button opens rather than being decided again at each. A refusal no pane can undo — no microphone attached — is not one of these (`AudioCaptureFailure.permission`). Cheppu keeps asking macOS whether it may still watch the keyboard, because nothing tells an app when a grant goes and a Hotkey that has quietly stopped arriving is indistinguishable from one nobody pressed; the Microphone is not part of that question, since a microphone switched off must not be what stops the key arriving.
+_Avoid_: permission error, unauthorised, revoked
 
 **History**:
 The list of recent Final Texts kept on the machine so a Dictation is never lost. Written before Insertion is attempted, so a Dictation whose Insertion failed is in it too. Holds Final Text and a timestamp only — never audio, never the Raw Transcript, and never which app the words went into — keeps the hundred most recent and drops the rest, and is emptied in one action (ADR-0009).

@@ -232,4 +232,19 @@ struct SettingsScreenTests {
             #expect(explanation.hasSuffix("."))
         }
     }
+
+
+    @Test("A Microphone that is off is never a reason to stop watching for the Hotkey")
+    func aMicrophoneThatIsOffIsNeverAReasonToStopWatching() {
+        // Cheppu keeps an eye on the grants it needs to see the Hotkey at all,
+        // because macOS tells nobody when one is taken away. The Microphone is
+        // not one of them: it is what a Dictation needs once the key has
+        // arrived, and a microphone switched off must not be what stops the key
+        // arriving in the first place.
+        #expect(Permission.neededToWatch(.byDefault) == [.accessibility])
+        #expect(!Permission.neededToWatch(.byDefault).contains(.microphone))
+        #expect(
+            Permission.neededBy(.byDefault)
+                == [.microphone] + Permission.neededToWatch(.byDefault))
+    }
 }

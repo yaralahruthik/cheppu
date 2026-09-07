@@ -211,6 +211,28 @@ public protocol FeedbackPort: Sendable {
     func play(_ cue: Cue) async
 }
 
+/// Saying which permission Cheppu does not have, and offering the way to the
+/// pane it is granted on.
+///
+/// A port of its own rather than part of the Feedback port, because it is not
+/// one of the two senses a Dictation is known through: the Pill and the Cues
+/// say what is happening to a Dictation, and this asks the user to leave what
+/// they are doing and go and grant something
+/// (`docs/product-experience.md` §9).
+public protocol PermissionPort: Sendable {
+    /// Names the permission and offers the way to its pane.
+    ///
+    /// Called by the Dictation that met the refusal, which is the moment the
+    /// user is owed the answer. It returns once they have been told rather than
+    /// once they have answered: a Dictation waiting on somebody to read an
+    /// alert would be a Hotkey that does nothing while it is up.
+    ///
+    /// How often one is worth putting in front of somebody who has already been
+    /// told is whoever implements this port's, because they are the only one who
+    /// can see whether the permission has come back since.
+    func askFor(_ permission: Permission) async
+}
+
 /// Every reading of the time the core takes, and every wait it does.
 ///
 /// Nothing in the core calls a system clock directly and nothing in it sleeps,

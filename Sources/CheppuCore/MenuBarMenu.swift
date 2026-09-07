@@ -4,11 +4,11 @@
 /// here knows about `NSMenu`, and nothing here performs the item's action —
 /// the shell maps an item onto the AppKit call that carries it out.
 public enum MenuBarItem: Equatable, Sendable {
-    /// Asks for the permission the Hotkey is missing, with the reason and the
-    /// way to the right System Settings pane. Offered only while Cheppu cannot
-    /// see the Hotkey, and it names the one permission that is in the way:
-    /// Accessibility for every Hotkey, and Input Monitoring for the Globe key,
-    /// which are two different panes and two different sentences.
+    /// Asks for a permission Cheppu does not have, with the reason and the way
+    /// to the right System Settings pane. Offered only while it is missing, and
+    /// it names which one: three permissions, three panes, three sentences, and
+    /// a user sent to the wrong one grants something they already had and comes
+    /// back to the same nothing.
     case allowPermission(Permission)
 
     /// Opens History, so that a Dictation that went into the wrong window can
@@ -42,6 +42,13 @@ public enum MenuBarItem: Equatable, Sendable {
     /// The label the user reads in the menu.
     public var title: String {
         switch self {
+        // Named for what the user has lost rather than for the permission
+        // itself. Accessibility and Input Monitoring are what the Hotkey needs,
+        // and somebody whose key does nothing is looking for exactly that
+        // sentence; the Microphone is what a Dictation needs once the key has
+        // arrived, and "The Hotkey Needs Microphone" would send them off to look
+        // at their keyboard.
+        case .allowPermission(.microphone): "Cheppu Needs Microphone…"
         case .allowPermission(let permission): "The Hotkey Needs \(permission.name)…"
         // The ellipsis is what says it opens a window rather than doing
         // something the moment it is let go of.
@@ -82,22 +89,24 @@ public enum MenuBarItem: Equatable, Sendable {
 
 /// The menu behind Cheppu's menu bar icon.
 ///
-/// It offers History, the Cue switch, Settings and Quit, and — while Cheppu
-/// cannot see the Hotkey — says so at the top. Onboarding joins it when its own
-/// ticket lands.
+/// It offers History, the Cue switch, Settings and Quit, and — for every
+/// permission Cheppu does not have — says so at the top. Onboarding joins it
+/// when its own ticket lands.
 public struct MenuBarMenu: Equatable, Sendable {
     public let items: [MenuBarItem]
 
     /// - Parameters:
-    ///   - missingForTheHotkey: the permission Cheppu is waiting on before it
-    ///     can watch for Activations, or nothing where it is already watching.
-    ///     Where there is one the menu says so and offers the way to fix it,
-    ///     because a user whose Hotkey does nothing has nowhere else to look.
-    ///     It comes first, because it is the reason they opened the menu.
+    ///   - missing: every permission Cheppu does not have this instant, in the
+    ///     order Settings reads them. Each gets an item of its own saying so and
+    ///     offering the way to fix it, because a user whose Hotkey or microphone
+    ///     does nothing has nowhere else to look — and one who is missing two of
+    ///     them and is offered only one would grant it, press the key again, and
+    ///     meet the same nothing. They come first, because they are the reason
+    ///     the menu was opened.
     ///   - areCuesOn: whether a Dictation makes a sound.
-    public init(missingForTheHotkey: Permission?, areCuesOn: Bool) {
+    public init(missing: [Permission], areCuesOn: Bool) {
         self.items =
-            (missingForTheHotkey.map { [MenuBarItem.allowPermission($0)] } ?? [])
+            missing.map(MenuBarItem.allowPermission)
             + [.history, .cues(areOn: areCuesOn), .settings, .quit]
     }
 }

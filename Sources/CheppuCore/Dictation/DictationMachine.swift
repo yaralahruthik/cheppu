@@ -118,12 +118,27 @@ public enum DictationEvent: Equatable, Sendable {
     /// A port could not do what it was asked.
     ///
     /// Which port is not in here, and neither is what the user is told: this is
-    /// every failure that is not an Insertion, and there is nothing useful to
-    /// say about a microphone that would not open or an Engine that would not
-    /// answer beyond ending the Dictation. All this event settles is that a
-    /// Dictation always has a way back to Idle, so a failure costs the user one
-    /// Dictation and not the app.
+    /// every failure that is not an Insertion and not a permission, and there is
+    /// nothing useful to say about a device that would not open or an Engine
+    /// that would not answer beyond ending the Dictation. All this event settles
+    /// is that a Dictation always has a way back to Idle, so a failure costs the
+    /// user one Dictation and not the app.
     case dictationFailed
+
+    /// A port was refused, and macOS will hand the refusal back the moment the
+    /// user flicks one switch.
+    ///
+    /// The one failure with a name worth saying out loud, and the whole of #17:
+    /// a permission that was granted and has been taken away since costs the
+    /// user every Dictation until they notice, and a Hotkey that does nothing is
+    /// indistinguishable from an app that has stopped working
+    /// (`docs/product-experience.md` §9).
+    ///
+    /// It carries which permission because that is the whole of what the user
+    /// can act on: the name they read and the pane they are sent to are the same
+    /// answer. Which refusals are one of these, and which are a plain
+    /// `dictationFailed`, is `AudioCaptureFailure.permission`'s to say.
+    case permissionMissing(Permission)
 }
 
 /// Something the machine has decided should happen.
@@ -164,6 +179,17 @@ public enum DictationEffect: Equatable, Sendable {
     /// back off it. What they had copied is gone, which is the deliberate cost
     /// of a Dictation that would otherwise be nowhere they could reach.
     case leaveOnTheClipboard(FinalText)
+
+    /// Name the permission that is missing, and offer the way to the pane it is
+    /// granted on.
+    ///
+    /// The Pill says which one; this is the other half, and it is the half the
+    /// user can act on. What it looks like — an alert, and how often one is
+    /// worth putting in front of somebody who has already been told — is the
+    /// app's, because it is the app that can see whether the permission has come
+    /// back. What the machine decides is that the Dictation that met the refusal
+    /// is the moment it is said (`docs/product-experience.md` §9).
+    case askFor(Permission)
 
     /// Keep the notice on screen for as long as it takes to read, and then take
     /// the Pill down.
@@ -493,6 +519,41 @@ public struct DictationMachine: Sendable {
             thisPressOpenedTheDictation = false
             handedToInsertion = nil
             return [.hidePill]
+
+        case (_, .permissionMissing(let permission)):
+            // A Dictation macOS would not let happen. It ends where any other
+            // failure ends it — Idle, with nothing left running and the next
+            // press free to start a Dictation of its own — and then says which
+            // permission is in the way rather than leaving the user with a key
+            // that did nothing.
+            //
+            // The Pill says it in words and stays up long enough to be read,
+            // exactly as the Clipboard Fallback's notice does: this is the other
+            // moment Cheppu has something to tell somebody whose eyes are on
+            // their work, and a Pill that flashed and went would be silence with
+            // an extra step. Asking for the permission is what puts them in
+            // front of the switch.
+            //
+            // The Cap is called off on the way out of Listening, exactly as
+            // every other way out of it does, so that one Dictation's five
+            // minutes can never end over the top of the next one. It is called
+            // off even where it was never started — the microphone is refused
+            // between the machine entering Listening and the Cap being armed —
+            // because calling off a wait that is not running costs nothing, and
+            // a state that decided this by guessing how far the last effect got
+            // would be a state reasoning about the core.
+            let wasListening = state == .listening
+            state = .idle
+            // Whatever the Hotkey is doing belongs to a Dictation that is over,
+            // and the words of one that got as far as Inserting are already in
+            // History.
+            thisPressOpenedTheDictation = false
+            handedToInsertion = nil
+            return (wasListening ? [.stopTheCap] : [])
+                + [
+                    .showPill(.permissionMissing(permission)), .leaveTheNoticeUp,
+                    .askFor(permission),
+                ]
 
         case (.idle, .dictationFailed):
             // A Dictation that had already finished deciding when one of the

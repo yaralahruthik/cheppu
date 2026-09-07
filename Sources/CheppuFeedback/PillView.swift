@@ -19,13 +19,32 @@ import CheppuCore
 /// eye reads without being looked at. That it moves at all is the other half:
 /// what this state exists to prevent is a pause being read as a hang.
 ///
-/// The Clipboard Fallback is the one state that is written rather than drawn,
-/// and the one that stands still. The other two are answers to "is it working?",
-/// which a shape answers faster than a word; this one asks the user to do
-/// something, and there is no shape that says "your words are on the clipboard".
+/// The two states that are written rather than drawn — the Clipboard Fallback,
+/// and a permission that is missing — are the ones that stand still. The other
+/// two are answers to "is it working?", which a shape answers faster than a
+/// word; these ask the user to do something, and there is no shape that says
+/// "your words are on the clipboard" or "your Microphone is switched off".
 ///
 /// It is drawn by hand for the same reason the menu bar icon is: the bundle is
 /// assembled by `Scripts/make-app.sh` and has nowhere to keep an asset.
+/// How a notice is set, and how much of the Pill it is allowed.
+///
+/// What it says is `PillState.words`, decided in the core: the words a user
+/// reads and the pane a button opens about the same moment are chosen from the
+/// same answer, and there is no sentence about Cheppu kept in a view.
+///
+/// The size is what fits the longest thing the Pill ever says — "Cheppu needs
+/// Input Monitoring", over two lines — inside the Pill it is in every other
+/// state. One that grew for a message would be a shape that moved while being
+/// read. `PillNoticeTests` is what holds that to be true rather than this
+/// sentence, which is the whole reason these two sit out here rather than with
+/// the rest of `PillView`'s measurements: a view is the main actor's, and what
+/// measures the words is not drawing them.
+enum PillNotice {
+    static let size: CGFloat = 13
+    static let inset: CGFloat = 10
+}
+
 final class PillView: NSView {
     /// The dark capsule everything is drawn on. Cheppu picks the colour rather
     /// than following the system's, because the Pill floats over other apps'
@@ -42,19 +61,6 @@ final class PillView: NSView {
     private static let barGap: CGFloat = 5
     private static let shortestBar: CGFloat = 5
 
-    /// The notice, and the size it is set in.
-    ///
-    /// Where the words are, in the words the rest of Cheppu uses for it. It
-    /// says nothing about why they are there: the user is reading this because
-    /// what they said did not appear, and "focus moved" or "Accessibility was
-    /// taken away" is an explanation they cannot do anything with. Where the
-    /// words are is the one thing they can.
-    ///
-    /// It fits the Pill at this size, which is what keeps the Pill the size it
-    /// is in every other state — one that grew for a message would be a shape
-    /// that moved while being read.
-    private static let notice = "On the clipboard"
-    private static let noticeSize: CGFloat = 13
 
     /// The mark that sweeps while the Engine works, and the track it runs in.
     private static let sweepLength: CGFloat = 38
@@ -90,7 +96,7 @@ final class PillView: NSView {
         self.state = state
 
         switch state {
-        case .listening, .onTheClipboard:
+        case .listening, .onTheClipboard, .permissionMissing:
             stopTravelling()
         case .transcribing where travelling == nil:
             startTravelling()
@@ -147,27 +153,46 @@ final class PillView: NSView {
         switch state {
         case .listening(let level): drawTheLevel(level)
         case .transcribing: drawTheSweep()
-        case .onTheClipboard: drawTheNotice()
+        case .onTheClipboard, .permissionMissing: drawTheNotice()
         }
     }
 
-    /// The Clipboard Fallback, in words.
+    /// What the Pill says, in words.
     ///
-    /// Centred on both axes, in the same white the bars and the sweep are drawn
-    /// in, so that the Pill reads as the same object saying something rather
-    /// than as a different thing that has appeared.
+    /// Centred on both axes and wrapped inside the Pill rather than allowed to
+    /// run past it, in the same white the bars and the sweep are drawn in, so
+    /// that the Pill reads as the same object saying something rather than as a
+    /// different thing that has appeared.
     private func drawTheNotice() {
+        guard let words = state.words else { return }
+
+        let centred = NSMutableParagraphStyle()
+        centred.alignment = .center
+        centred.lineBreakMode = .byWordWrapping
+
         let notice = NSAttributedString(
-            string: Self.notice,
+            string: words,
             attributes: [
-                .font: NSFont.systemFont(ofSize: Self.noticeSize, weight: .medium),
+                .font: NSFont.systemFont(ofSize: PillNotice.size, weight: .medium),
                 .foregroundColor: Self.ink,
+                .paragraphStyle: centred,
             ]
         )
 
-        let size = notice.size()
+        let room = bounds.insetBy(dx: PillNotice.inset, dy: 0)
+        let wrapped = notice.boundingRect(
+            with: NSSize(width: room.width, height: .greatestFiniteMagnitude),
+            options: .usesLineFragmentOrigin
+        )
         notice.draw(
-            at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2))
+            with: NSRect(
+                x: room.minX,
+                y: bounds.midY - wrapped.height / 2,
+                width: room.width,
+                height: wrapped.height
+            ),
+            options: .usesLineFragmentOrigin
+        )
     }
 
     /// The voice, as five bars rising from the height they rest at.

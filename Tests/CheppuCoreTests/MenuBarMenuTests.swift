@@ -9,13 +9,13 @@ import Testing
 struct MenuBarMenuTests {
     @Test("Offers Quit")
     func offersQuit() {
-        #expect(MenuBarMenu(missingForTheHotkey: nil, areCuesOn: true).items.contains(.quit))
+        #expect(MenuBarMenu(missing: [], areCuesOn: true).items.contains(.quit))
     }
 
     @Test("With the Hotkey working, the menu is History, the Cues, Settings and Quit")
     func withTheHotkeyWorkingTheMenuIsHistoryTheCuesSettingsAndQuit() {
         #expect(
-            MenuBarMenu(missingForTheHotkey: nil, areCuesOn: true).items
+            MenuBarMenu(missing: [], areCuesOn: true).items
                 == [.history, .cues(areOn: true), .settings, .quit]
         )
     }
@@ -65,7 +65,7 @@ struct MenuBarMenuTests {
         // the missing permission, and it comes first, because it is the reason
         // they opened the menu.
         #expect(
-            MenuBarMenu(missingForTheHotkey: .accessibility, areCuesOn: true).items
+            MenuBarMenu(missing: [.accessibility], areCuesOn: true).items
                 == [
                     .allowPermission(.accessibility), .history, .cues(areOn: true), .settings,
                     .quit,
@@ -82,6 +82,30 @@ struct MenuBarMenuTests {
         #expect(
             MenuBarItem.allowPermission(.inputMonitoring).title.contains("Input Monitoring")
         )
+    }
+
+    @Test("Every permission Cheppu is missing gets its own way out, in the order Settings reads them")
+    func everyPermissionCheppuIsMissingGetsItsOwnWayOut() {
+        // A user whose Microphone and Accessibility are both off and who was
+        // offered only one of them would grant it, press the key again, and
+        // meet the same nothing. The menu is the only part of Cheppu they can
+        // reach, so it names every permission that is in the way.
+        #expect(
+            MenuBarMenu(missing: [.microphone, .accessibility], areCuesOn: false).items == [
+                .allowPermission(.microphone), .allowPermission(.accessibility),
+                .history, .cues(areOn: false), .settings, .quit,
+            ])
+    }
+
+    @Test("A Microphone that is off is said in its own words, not the Hotkey's")
+    func aMicrophoneThatIsOffIsSaidInItsOwnWords() {
+        // Accessibility and Input Monitoring are what the Hotkey needs; the
+        // Microphone is what a Dictation needs once the key has arrived. A
+        // Microphone row that said "The Hotkey Needs Microphone" would send
+        // somebody to look at their keyboard.
+        #expect(MenuBarItem.allowPermission(.microphone).title.contains("Microphone"))
+        #expect(!MenuBarItem.allowPermission(.microphone).title.contains("Hotkey"))
+        #expect(MenuBarItem.allowPermission(.accessibility).title.contains("Hotkey"))
     }
 
     @Test("An item that does something rather than switches something is never ticked")

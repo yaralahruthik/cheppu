@@ -30,11 +30,6 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     /// (ADR-0009).
     private let clearHistory: () -> Void
 
-    /// Says the Cue switch has moved. It is a menu bar item as well as a line
-    /// here, and a tick that disagreed with the sound would be worse than
-    /// either.
-    private let cuesMoved: () -> Void
-
     /// Says the Hotkey has moved, so that whoever is watching the keyboard
     /// watches for the new one. Cheppu is not told which key it is: it reads
     /// that where it uses it, exactly as it reads every other switch
@@ -60,14 +55,12 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
         launchingAtLogin launchAtLogin: LaunchAtLogin = LaunchAtLogin(),
         asking permissions: any Permissions,
         clearingHistory clearHistory: @escaping () -> Void,
-        whenTheCuesMove cuesMoved: @escaping () -> Void,
         whenTheHotkeyMoves hotkeyMoved: @escaping () -> Void
     ) {
         self.preferences = preferences
         self.launchAtLogin = launchAtLogin
         self.permissions = permissions
         self.clearHistory = clearHistory
-        self.cuesMoved = cuesMoved
         self.hotkeyMoved = hotkeyMoved
         super.init()
     }
@@ -231,8 +224,10 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
         case .cleanupRule(let rule, _):
             preferences.turn(rule, on: on)
         case .cues:
+            // Nobody is told. The Cue switch is a menu bar item as well as a
+            // line here, and the menu is filled as it opens: it is already
+            // saying what this window just did.
             preferences.turnCues(on: on)
-            cuesMoved()
         case .launchAtLogin:
             // Drawn again from what the system says afterwards rather than from
             // what was asked for: a registration that would not take must not

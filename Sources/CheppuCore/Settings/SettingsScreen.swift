@@ -45,7 +45,18 @@ public enum Permission: CaseIterable, Equatable, Hashable, Sendable {
     /// see Input Monitoring, and a row offering the way to a pane they do not
     /// need is the screen asking for something on Cheppu's behalf.
     public static func neededBy(_ hotkey: Hotkey) -> [Permission] {
-        [.microphone, .accessibility] + (hotkey.needsInputMonitoring ? [.inputMonitoring] : [])
+        [.microphone] + neededToWatch(hotkey)
+    }
+
+    /// The permissions Cheppu cannot watch the Hotkey without.
+    ///
+    /// The Microphone is not one of them, which is the whole of why this is a
+    /// list of its own: it is what a Dictation needs once the key has arrived,
+    /// and a microphone switched off must never be the reason Cheppu stops
+    /// watching for the key. Nothing tells an app when a grant is taken away
+    /// (#17), so this is what it keeps asking about while it is watching.
+    public static func neededToWatch(_ hotkey: Hotkey) -> [Permission] {
+        [.accessibility] + (hotkey.needsInputMonitoring ? [.inputMonitoring] : [])
     }
 
     /// What macOS calls it, so that the name on the screen is the name on the
