@@ -62,9 +62,11 @@ Each of these is a real feature that a real user wants. They are out because eac
 Cheppu asks for two permissions, each with a one-line reason at the moment it is needed — and for a third only if the hotkey you chose needs it:
 
 - **Microphone**: to hear you, asked for by the first dictation that needs it.
-- **Accessibility**: to insert text into other apps and to see the hotkey while another app has focus. macOS has no prompt for this one — it is a switch in System Settings — so Cheppu says why in one line and opens the right pane for you. Until it is granted, the menu bar menu says the hotkey cannot work rather than leaving you with a key that does nothing.
+- **Accessibility**: to insert text into other apps and to see the hotkey while another app has focus. macOS has no prompt for this one — it is a switch in System Settings — so Cheppu says why in one line and opens the right pane for you. Until it is granted, and again if it is ever taken away, the menu bar menu says the hotkey cannot work rather than leaving you with a key that does nothing.
 
 Settings says what macOS currently thinks of each of them, without you having to start a dictation to find out, and puts a button next to any it does not have that opens the right pane.
+
+A permission granted once can be taken away later, and macOS tells nobody when that happens. Cheppu never meets one in silence. Dictate with the microphone switched off and the pill says which permission is missing and stays up long enough to be read, and Cheppu says why in one line and offers the pane it is granted on — once, until you grant it back. Take away Accessibility and the hotkey stops arriving; Cheppu keeps asking macOS whether it may still watch the keyboard, so within a couple of seconds it says the same thing rather than leaving you with a key that does nothing. The menu bar names every permission that is missing for as long as it is, Settings says so the moment you look, and anything you had already said is in History either way.
 
 Choosing the Fn/Globe key as your hotkey adds one more, **Input Monitoring**, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing" — without both, macOS acts on the press before Cheppu ever sees it. Cheppu explains both at the moment you choose that key, not before, and asks for Input Monitoring then and never otherwise. On any other hotkey it is not asked for, not mentioned, and not a row in Settings.
 

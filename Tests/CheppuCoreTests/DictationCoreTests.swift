@@ -57,6 +57,7 @@ struct DictationCoreTests {
             hearsLevels: [InputLevel] = [],
             now: Date = DictationCoreTests.aTuesdayAfternoon,
             typingIn app: TargetApp? = DictationCoreTests.mail,
+            microphone: FakeAudioCapture.Outcome = .opens,
             insertion: FakeInsertion.Outcome = .lands,
             hadCopied: String? = nil,
             historyRefuses: Bool = false,
@@ -78,12 +79,15 @@ struct DictationCoreTests {
             self.core = DictationCore(
                 cleaningWith: cleanup,
                 hotkey: hotkey,
-                audio: FakeAudioCapture(journal: journal, captured: captures, hearsLevels: hearsLevels),
+                audio: FakeAudioCapture(
+                    journal: journal, captured: captures, outcome: microphone,
+                    hearsLevels: hearsLevels),
                 engine: FakeEngine(journal: journal, transcript: hears),
                 insertion: FakeInsertion(journal: journal, focus: focus, outcome: insertion),
                 clipboard: clipboard,
                 history: FakeHistory(journal: journal, refuses: historyRefuses),
                 feedback: FakeFeedback(journal: journal),
+                permissions: FakePermissions(journal: journal),
                 clock: clock
             )
         }
@@ -1062,5 +1066,65 @@ struct DictationCoreTests {
                         recordedAt: Self.aTuesdayAfternoon
                     )
                 )))
+    }
+
+
+    // MARK: - A permission that is missing
+
+    @Test("A Dictation with the Microphone taken away says so rather than doing nothing")
+    func aDictationWithTheMicrophoneTakenAwaySaysSo() async throws {
+        let scenario = Scenario(microphone: .findsTheMicrophoneTakenAway)
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+
+        // Capture is the first thing a Dictation does, so a Microphone that has
+        // been taken away means no Cue, no level and nothing heard. What the
+        // user gets instead is the Pill naming the permission and Cheppu
+        // offering the pane it is granted on — never the silence that is
+        // indistinguishable from an app that has stopped working
+        // (`docs/product-experience.md` §9).
+        #expect(
+            await scenario.callsIgnoringTimestamps == [
+                .pillShown(.permissionMissing(.microphone)),
+                .askedFor(.microphone),
+            ])
+
+        await scenario.readTheNotice()
+        #expect(await scenario.journal.calls.last == .pillHidden)
+    }
+
+    @Test("A microphone that is not there is not a permission the user is sent off to grant")
+    func aMicrophoneThatIsNotThereIsNotAPermissionToGrant() async throws {
+        let scenario = Scenario(microphone: .findsNoMicrophone)
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+
+        // No input device is not something a System Settings pane can fix
+        // (`AudioCaptureFailure.permission`). The Dictation ends, and nothing is
+        // named: there is no switch to send the user to.
+        #expect(await scenario.journal.calls == [.pillHidden])
+    }
+
+    @Test("Every attempt is answered, because every attempt is a Dictation that did not happen")
+    func everyAttemptIsAnswered() async throws {
+        let scenario = Scenario(microphone: .findsTheMicrophoneTakenAway)
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+        await scenario.readTheNotice()
+        await scenario.hotkey.press()
+
+        // Saying it once and leaving the second press to fail quietly would be
+        // the same silence one press later. How often Cheppu puts an alert in
+        // front of the user is the app's to decide; what the core does is
+        // answer the press it was given.
+        let said = await scenario.journal.calls.filter {
+            $0 == .pillShown(.permissionMissing(.microphone))
+        }
+        let named = await scenario.journal.calls.filter { $0 == .askedFor(.microphone) }
+        #expect(said.count == 2)
+        #expect(named.count == 2)
     }
 }
