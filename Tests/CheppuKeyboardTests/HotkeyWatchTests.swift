@@ -19,7 +19,7 @@ struct HotkeyWatchTests {
             accessibility: accessibility,
             inputMonitoring: inputMonitoring,
             keyboard: keyboard,
-            choice: FakeHotkeyChoice(hotkey)
+            choice: ChosenHotkey(hotkey)
         )
     }
 
@@ -103,7 +103,7 @@ struct HotkeyWatchTests {
         // no relaunch, and nothing between the window and the keyboard that has
         // to be kept in step (ADR-0010).
         let keyboard = FakeKeyboard()
-        let choice = ChangeableHotkey(.byDefault)
+        let choice = ChosenHotkey()
         let watch = HotkeyWatch(
             accessibility: FakeAccessibilityAccess(answering: [true]),
             inputMonitoring: FakeInputMonitoringAccess(),
@@ -186,6 +186,34 @@ struct HotkeyWatchTests {
 
         #expect(await reported.nextGesture() == .pressed)
         #expect(await reported.nextGesture() == .released)
+    }
+
+    @Test("A Hotkey that is refused takes the one it replaced down with it")
+    func aHotkeyThatIsRefusedTakesTheOneItReplacedDownWithIt() async throws {
+        // Somebody moves their Hotkey to the Globe key and does not grant Input
+        // Monitoring. What they must not be left with is the key they moved off
+        // still starting Dictations while Settings says they dictate on the
+        // Globe key.
+        let keyboard = FakeKeyboard()
+        let choice = ChosenHotkey()
+        let watch = HotkeyWatch(
+            accessibility: FakeAccessibilityAccess(answering: [true]),
+            inputMonitoring: FakeInputMonitoringAccess(granted: false),
+            keyboard: keyboard,
+            choice: choice
+        )
+        let reported = ReportedGestures()
+
+        try await watch.observe(reported.report)
+        await choice.change(to: .bareModifier(.function))
+
+        await #expect(throws: HotkeyFailure.inputMonitoringDenied) {
+            try await watch.observe(reported.report)
+        }
+
+        keyboard.strikes(Self.hotkeyDown, Self.everythingUp)
+        #expect(!keyboard.isBeingWatched)
+        #expect(await reported.gestures.isEmpty)
     }
 
     @Test("Accessibility is answered before Input Monitoring is ever considered")

@@ -150,7 +150,10 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
-        stopChoosingAHotkey()
+        // Stopped, and not redrawn: the window this would draw into is on its
+        // way out.
+        recorder?.stopListening()
+        recorder = nil
     }
 
     /// Draws the screen the core describes.
@@ -305,13 +308,22 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
             }
         }
         recorder?.listen()
-        fill()
+        redrawAfterTheClick()
     }
 
     private func stopChoosingAHotkey() {
         recorder?.stopListening()
         recorder = nil
-        fill()
+        redrawAfterTheClick()
+    }
+
+    /// Draws the screen again on the next turn of the run loop.
+    ///
+    /// Not here: this is called from a row's own button, and redrawing takes
+    /// that button out from under the click that is still being delivered — the
+    /// same reason the login-item switch waits.
+    private func redrawAfterTheClick() {
+        Task { fill() }
     }
 
     /// Takes the Hotkey the user just pressed, once they have been told what it
@@ -321,7 +333,7 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     /// it: a user who is told what a key does once it is already theirs has
     /// been informed rather than asked.
     private func take(_ hotkey: Hotkey) {
-        guard hotkey.warnings.isEmpty || saysYesTo(hotkey.warnings, for: hotkey) else {
+        guard hotkey.warnings.isEmpty || saysYesTo(hotkey) else {
             fill()
             return
         }
@@ -338,8 +350,11 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     ///
     /// Everything they have to know in one alert rather than one after another,
     /// because it is one decision: this key, or another one.
-    private func saysYesTo(_ warnings: [HotkeyWarning], for hotkey: Hotkey) -> Bool {
+    private func saysYesTo(_ hotkey: Hotkey) -> Bool {
+        let warnings = hotkey.warnings
         let alert = NSAlert()
+        // The first, which is the Globe key's wherever there are two: what a
+        // key needs before it works at all outranks what it would double.
         alert.messageText = warnings[0].title
         alert.informativeText = warnings.map(\.explanation).joined(separator: "\n\n")
         alert.addButton(withTitle: "Use \(hotkey.name)")

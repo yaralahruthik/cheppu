@@ -84,12 +84,12 @@ public enum Hotkey: Equatable, Hashable, Sendable {
 
     /// What macOS already does with this chord, if it does anything.
     ///
-    /// Matched on the symbols rather than on the keys, because macOS does not
-    /// care which Command key opened Spotlight and neither can this: a warning
-    /// that only fired for the left one would miss half the people it is for.
+    /// Matched with the sides taken off, because macOS does not care which
+    /// Command key opened Spotlight — and neither does the Chord itself, which
+    /// is matched at the keyboard the same way.
     private var systemShortcutItSharesWith: String? {
         guard case .chord(let key, let modifiers) = self else { return nil }
-        let symbols = Set(modifiers.map(\.symbol))
+        let symbols = Modifier.withoutSides(modifiers)
 
         return Self.systemShortcuts.first { $0.symbols == symbols && $0.key == key.name }?.does
     }

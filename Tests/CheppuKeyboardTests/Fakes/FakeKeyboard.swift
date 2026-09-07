@@ -100,22 +100,11 @@ final class FakeInputMonitoringAccess: InputMonitoringAccess, @unchecked Sendabl
     var timesAsked: Int { lock.withLock { asked } }
 }
 
-/// The Hotkey the user chose.
-struct FakeHotkeyChoice: HotkeyChoice {
-    let chosen: Hotkey
-
-    init(_ chosen: Hotkey = .byDefault) {
-        self.chosen = chosen
-    }
-
-    func hotkey() async -> Hotkey { chosen }
-}
-
-/// A Hotkey the user changes while the app is running.
-actor ChangeableHotkey: HotkeyChoice {
+/// The Hotkey the user chose, and can choose again while the app is running.
+actor ChosenHotkey: HotkeyChoice {
     private var chosen: Hotkey
 
-    init(_ chosen: Hotkey) {
+    init(_ chosen: Hotkey = .byDefault) {
         self.chosen = chosen
     }
 

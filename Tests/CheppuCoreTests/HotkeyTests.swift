@@ -123,6 +123,51 @@ struct HotkeyTests {
         }
     }
 
+    @Test("Which permission a Hotkey that cannot be watched is waiting on")
+    func whichPermissionAHotkeyThatCannotBeWatchedIsWaitingOn() {
+        // Two failures, two panes, two sentences. A user who chose the Globe
+        // key and was sent to the Accessibility pane would grant something they
+        // already had and come back to a Hotkey that still does nothing.
+        #expect(HotkeyFailure.accessibilityDenied.permission == .accessibility)
+        #expect(HotkeyFailure.inputMonitoringDenied.permission == .inputMonitoring)
+    }
+
+    @Test("Being asked for a permission names the key the user actually chose")
+    func beingAskedForAPermissionNamesTheKeyTheUserActuallyChose() {
+        // Somebody who moved their Hotkey needs to read the key they picked,
+        // not the one Cheppu ships with (`docs/product-experience.md` §9).
+        let chord = Hotkey.chord(Key(named: "D")!, with: [.leftControl, .leftOption])
+
+        #expect(Permission.accessibility.whyItIsNeeded(toWatch: chord).contains("⌃⌥D"))
+
+        // And the Globe key's says both things it needs, because either one
+        // missing is a key that does nothing.
+        let globe = Permission.inputMonitoring.whyItIsNeeded(toWatch: .bareModifier(.function))
+        #expect(globe.contains("Globe"))
+        #expect(globe.contains("Do Nothing"))
+    }
+
+    // MARK: - Which keys a chord may be built on
+
+    @Test("Escape is not a key a Hotkey can be built on")
+    func escapeIsNotAKeyAHotkeyCanBeBuiltOn() {
+        // It Cancels a Dictation (ADR-0006), and a key that did both would mean
+        // two things at the same moment. Its position is kept beside the table
+        // it is left out of, because both keyboards Cheppu reads recognise it.
+        #expect(Key(code: Key.escape) == nil)
+        #expect(Key(named: "Escape") == nil)
+    }
+
+    @Test("The keys under the hands can all be half of a chord")
+    func theKeysUnderTheHandsCanAllBeHalfOfAChord() {
+        // Letters, digits, punctuation, the function row and the arrows: a
+        // chord the user tries to record and that silently does nothing is
+        // worse than one they were never offered.
+        for name in ["A", "0", "-", "[", ";", "Space", "Return", "Tab", "F12", "Up"] {
+            #expect(Key(named: name) != nil, "\(name) should be a key a Hotkey can be built on")
+        }
+    }
+
     // MARK: - What is remembered
 
     @Test("The Hotkey the user chose is the Hotkey they get back")

@@ -52,6 +52,16 @@ public enum Modifier: String, CaseIterable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// The modifiers with the sides taken off, which is how macOS itself
+    /// matches a chord: ⌘ is ⌘ whichever hand pressed it.
+    ///
+    /// A Bare Modifier is the other way round — the right Option key is the
+    /// default precisely because it is not the left one — so this is only ever
+    /// asked of a Chord.
+    public static func withoutSides(_ modifiers: Set<Modifier>) -> Set<String> {
+        Set(modifiers.map(\.symbol))
+    }
+
     /// The modifiers a set of macOS event flags says are held.
     ///
     /// Which side a modifier is on lives in the device-dependent bits, and

@@ -53,6 +53,13 @@ public actor HotkeyWatch: HotkeyPort {
     public func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async throws {
         let hotkey = await choice.hotkey()
 
+        // First, and before anything can refuse: whatever was being watched for
+        // is over. A watch left behind would be a second reader of every key on
+        // the machine — and, once the Hotkey can be changed, the key the user
+        // has just moved off still starting Dictations while Settings says
+        // otherwise.
+        stopWatching()
+
         // Asked here, every time watching starts, rather than remembered from
         // launch: a grant taken away in System Settings is then something the
         // app can say out loud rather than a Hotkey that silently stopped
@@ -65,10 +72,6 @@ public actor HotkeyWatch: HotkeyPort {
         guard !hotkey.needsInputMonitoring || inputMonitoring.isGranted else {
             throw HotkeyFailure.inputMonitoringDenied
         }
-
-        // Nothing asks for this, but a watch left behind would be a second
-        // reader of every key on the machine.
-        stopWatching()
 
         // The system delivers events on a thread that cannot wait, and what
         // reads them is one gesture at a time. The stream is what stands

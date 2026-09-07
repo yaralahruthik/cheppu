@@ -58,6 +58,34 @@ public enum Permission: CaseIterable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// Why Cheppu wants it, said at the moment the Hotkey does not work
+    /// without it — which is longer than the line Settings has room for,
+    /// because the user is being asked to leave the app and go and grant
+    /// something (`docs/product-experience.md` §9).
+    ///
+    /// It names the key they actually chose. Somebody who moved their Hotkey to
+    /// the Globe key and is being asked for Input Monitoring needs to read the
+    /// key they picked, not the one Cheppu ships with.
+    public func whyItIsNeeded(toWatch hotkey: Hotkey) -> String {
+        switch self {
+        case .accessibility:
+            "Cheppu watches for your hotkey — \(hotkey.name) — while you are working in "
+                + "another app, and macOS calls that Accessibility."
+        case .inputMonitoring:
+            // The permission is half of it. The other half is a macOS setting
+            // nothing else on the machine would send them to, and a user who
+            // granted this and still had a key that did nothing would have no
+            // way of guessing why.
+            "You dictate on the Globe key, and macOS does not hand that one to apps the way "
+                + "it hands over every other key. It also needs System Settings › Keyboard › "
+                + "“Press 🌐 key to” set to “Do Nothing”, or macOS acts on the press before "
+                + "Cheppu sees it."
+        // Never asked for this way: the Microphone is asked for by the first
+        // Dictation that needs it, inside a prompt of its own.
+        case .microphone: reason
+        }
+    }
+
     /// Why Cheppu wants it, in the one line it is worth.
     public var reason: String {
         switch self {
@@ -178,7 +206,9 @@ public enum SettingsControl: Equatable, Sendable {
     /// it is are the same answer.
     public var reading: String? {
         switch self {
-        case .hotkey(_, isBeingChosen: true): "Listening…"
+        // Not "Listening", which is what a Dictation does
+        // (`docs/product-experience.md` §3). This row is waiting for one key.
+        case .hotkey(_, isBeingChosen: true): "Press a key…"
         case .hotkey(let hotkey, _): hotkey.name
         case .permission(_, let status): status.name
         case .cleanupRule, .cues, .launchAtLogin, .history: nil
@@ -212,8 +242,8 @@ public enum SettingsControl: Equatable, Sendable {
 ///
 /// One list of sections, and no notion of a second page anywhere in it: the
 /// window this describes has no tabs, because a setting behind a tab is one the
-/// user has to go looking for, and the whole of what Cheppu can be set to is
-/// eleven lines (`docs/product-experience.md` §11).
+/// user has to go looking for, and the whole of what Cheppu can be set to fits
+/// on the one screen without scrolling (`docs/product-experience.md` §11).
 public struct SettingsScreen: Equatable, Sendable {
     /// A heading and the rows under it. A section groups rows on the one
     /// screen; it never hides them.

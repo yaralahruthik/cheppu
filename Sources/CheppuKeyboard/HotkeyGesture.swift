@@ -115,11 +115,21 @@ struct HotkeyGesture {
     private mutating func seeingWithAChord(
         _ modifiers: Set<Modifier>, _ stroke: KeyStroke
     ) -> HotkeyEvent? {
+        let wanted = Modifier.withoutSides(modifiers)
+        let holding = Modifier.withoutSides(held)
+
         switch stroke {
         case .hotkeyKeyPressed:
             // A key held down repeats, and every repeat arrives here as another
             // press. Only the first of them started anything.
-            guard !isHeld, held == modifiers else { return nil }
+            //
+            // Matched with the sides taken off, because that is what the user
+            // was shown: a Chord reads ⌃⌥D in Settings and in every menu on the
+            // machine, and one that only worked on the Control key they
+            // happened to be near when they chose it would be a Hotkey that
+            // does nothing for no reason they could see. Exactly these and no
+            // more, so that ⌃⌥⇧D stays somebody else's shortcut.
+            guard !isHeld, holding == wanted else { return nil }
             isHeld = true
             return .pressed
 
@@ -133,7 +143,11 @@ struct HotkeyGesture {
             // it leaves first ends the Hold. Ending it on the modifiers rather
             // than waiting for the key itself is what stops a Dictation running
             // on past the words.
-            guard isHeld, held != modifiers else { return nil }
+            //
+            // What ends it is one of the chord's own keys being let go of, not
+            // anything joining it: a Shift brushed halfway through a Hold is a
+            // key brushed during a Dictation, and what was said is kept.
+            guard isHeld, !wanted.isSubset(of: holding) else { return nil }
             isHeld = false
             return .released
 

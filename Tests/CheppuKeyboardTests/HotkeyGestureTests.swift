@@ -243,6 +243,35 @@ struct HotkeyGestureTests {
         #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
     }
 
+    @Test("A chord works on either side of the keyboard, because that is what it says")
+    func aChordWorksOnEitherSideOfTheKeyboard() {
+        // It reads ⌃⌥D in Settings and in every menu on the machine, and macOS
+        // does not care which Control key that is. One that only worked on the
+        // key the user happened to be near when they chose it would be a Hotkey
+        // that does nothing for no reason they could see.
+        let strokes: [KeyStroke] = [
+            .modifiersHeld([.rightControl, .rightOption]), .hotkeyKeyPressed, .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
+    @Test("A modifier brushed during a Hold on a chord does not end it")
+    func aModifierBrushedDuringAHoldOnAChordDoesNotEndIt() {
+        // What ends a Hold is one of the chord's own keys being let go of, not
+        // something joining it. A Shift brushed halfway through is a key
+        // brushed during a Dictation, and what was said is kept.
+        let strokes: [KeyStroke] = [
+            Self.chordHeld,
+            .hotkeyKeyPressed,
+            .modifiersHeld([.leftControl, .leftOption, .leftShift]),
+            Self.chordHeld,
+            .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
     @Test("Escape during a Hold on a chord Cancels it")
     func escapeDuringAHoldOnAChordCancelsIt() {
         let strokes: [KeyStroke] = [

@@ -19,11 +19,6 @@ import CheppuCore
 /// there. This is the glue that feeds it.
 @MainActor
 final class HotkeyRecorder {
-    /// Escape. It stops the recording rather than becoming a Hotkey: it Cancels
-    /// a Dictation (ADR-0006), and a key that did both would mean two things at
-    /// the same moment.
-    private static let escape: UInt16 = 53
-
     /// Said once, with the Hotkey the user chose, or with nothing where they
     /// pressed Escape.
     private let chosen: (Hotkey?) -> Void
@@ -76,7 +71,10 @@ final class HotkeyRecorder {
         // this turns out to be, if it is one a Hotkey may be built on.
         let position = event.keyCode
 
-        if position == Self.escape {
+        // Escape stops the recording rather than becoming a Hotkey: it Cancels
+        // a Dictation (ADR-0006), and a key that did both would mean two things
+        // at the same moment.
+        if position == Key.escape {
             finish(with: nil, chosen: true)
             return
         }

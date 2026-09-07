@@ -35,7 +35,7 @@ A Hotkey that is one modifier key held on its own — the fastest thing there is
 _Avoid_: single key, modifier-only hotkey
 
 **Chord**:
-A Hotkey that is a key struck while exactly a set of modifiers is held — ⌃⌥D. Never a Spoiled Press: a Chord was unambiguous the moment it was struck, so a key brushed during a Hold on one is a key brushed during a Dictation, and what was said is kept. The one key it is built on is the one key Cheppu tells apart from what the user types (ADR-0011).
+A Hotkey that is a key struck while exactly a set of modifiers is held — ⌃⌥D — and no more of them, so a chord with something extra held is somebody else's shortcut. Which side of the keyboard those modifiers are on does not matter, because it does not matter to macOS and is not what the user was shown. Never a Spoiled Press: a Chord was unambiguous the moment it was struck, so a key brushed during a Hold on one — a modifier included — is a key brushed during a Dictation, and what was said is kept. It ends when one of its own keys is let go of. The one key it is built on is the one key Cheppu tells apart from what the user types (ADR-0011).
 _Avoid_: key combination, shortcut, combo
 
 **Engine**:

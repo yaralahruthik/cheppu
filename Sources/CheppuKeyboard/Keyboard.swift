@@ -102,20 +102,21 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
     /// has a key in it at all.
     private var hotkeyKey: Int64?
 
-    /// Modifiers, and ordinary keys going down and coming back up.
+    /// Modifiers, and ordinary keys going down — and coming back up, but only
+    /// where the Hotkey is a chord.
     ///
-    /// Key-up is asked for because a Hold on a chord ends when the key is let
-    /// go of, and a Dictation that only stopped when the modifiers came up
-    /// would run on past the words. A bare-modifier Hotkey needs none of it —
-    /// its own release arrives as a change of flags — and pays nothing for it:
-    /// a key-up that is not the Hotkey's is dropped where it arrives.
-    private static let interesting: CGEventMask =
-        (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
-        | (1 << CGEventType.keyUp.rawValue)
+    /// Key-up is what ends a Hold on a chord: a Dictation that only stopped
+    /// when the modifiers came up would run on past the words. A bare-modifier
+    /// Hotkey needs none of it — its own release arrives as a change of flags —
+    /// and is not handed it, so on the default Hotkey Cheppu is not sent a
+    /// single key-up on the machine.
+    private static func interesting(tellingApart key: Key?) -> CGEventMask {
+        let downs: CGEventMask =
+            (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
+        guard key != nil else { return downs }
+        return downs | (1 << CGEventType.keyUp.rawValue)
+    }
 
-    /// Escape. Virtual key codes are positions on the keyboard rather than
-    /// letters, and this is the position macOS calls `kVK_Escape`.
-    private static let escape: Int64 = 53
 
     func watch(tellingApart key: Key?, _ struck: @escaping @Sendable (KeyStroke) -> Void) throws {
         // Nothing asks for this, but a tap left behind would be a second
@@ -131,7 +132,7 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
                 tap: .cgSessionEventTap,
                 place: .headInsertEventTap,
                 options: .listenOnly,
-                eventsOfInterest: Self.interesting,
+                eventsOfInterest: Self.interesting(tellingApart: key),
                 callback: { _, type, event, watcher in
                     if let watcher {
                         Unmanaged<SystemKeyboard>.fromOpaque(watcher)
@@ -231,7 +232,7 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
     /// What a key at this position means to Cheppu, which is one of three
     /// things and usually the last of them.
     private func report(at position: Int64, wentDown: Bool) {
-        if position == Self.escape {
+        if position == Int64(Key.escape) {
             // Only on the way down. Escape coming back up says nothing a
             // Dictation could act on.
             if wentDown { report(.escapePressed) }
@@ -250,18 +251,6 @@ final class SystemKeyboard: Keyboard, @unchecked Sendable {
 
     private func report(_ stroke: KeyStroke) {
         lock.withLock { struck }?(stroke)
-    }
-}
-
-extension Modifier {
-    /// The modifier keys an event says are held.
-    ///
-    /// The reading itself is the core's, because the window the user picks a
-    /// Hotkey in asks macOS the same question of a different event type, and an
-    /// app that decoded "which Option key was that?" twice would eventually
-    /// decode it differently.
-    static func held(in flags: CGEventFlags) -> Set<Modifier> {
-        held(inFlags: flags.rawValue)
     }
 }
 

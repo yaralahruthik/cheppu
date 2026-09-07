@@ -150,9 +150,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                     showMenu()
                     return
                 } catch {
-                    let missing: Permission =
-                        error as? HotkeyFailure == .inputMonitoringDenied
-                        ? .inputMonitoring : .accessibility
+                    // A failure Cheppu has no name for is answered as the one
+                    // it does: without Accessibility no Hotkey works at all, so
+                    // it is the thing to say to somebody whose key is doing
+                    // nothing.
+                    let missing = (error as? HotkeyFailure)?.permission ?? .accessibility
                     missingForTheHotkey = missing
                     showMenu()
                     if !hasSaidWhy {

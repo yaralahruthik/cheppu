@@ -20,7 +20,7 @@ struct ModifierKeysTests {
     }
 
     private static func held(_ flags: CGEventFlags, andSides sides: UInt64 = 0) -> Set<Modifier> {
-        Modifier.held(in: CGEventFlags(rawValue: flags.rawValue | sides))
+        Modifier.held(inFlags: flags.rawValue | sides)
     }
 
     @Test("The right Option key is told apart from the left one")

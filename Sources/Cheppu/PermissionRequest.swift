@@ -23,7 +23,7 @@ enum PermissionRequest {
     static func ask(for permission: Permission, toWatch hotkey: Hotkey) {
         let alert = NSAlert()
         alert.messageText = "Cheppu needs \(permission.name) access"
-        alert.informativeText = reason(for: permission, watching: hotkey)
+        alert.informativeText = permission.whyItIsNeeded(toWatch: hotkey)
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Not Now")
 
@@ -37,24 +37,5 @@ enum PermissionRequest {
         // place: an app that knew two ways to the one switch would eventually
         // know one of them wrongly.
         SystemSettingsPane.open(permission)
-    }
-
-    private static func reason(for permission: Permission, watching hotkey: Hotkey) -> String {
-        switch permission {
-        case .accessibility:
-            "Cheppu watches for your hotkey — \(hotkey.name) — while you are working in "
-                + "another app, and macOS calls that Accessibility."
-        case .inputMonitoring:
-            // The permission is half of it. The other half is a macOS setting
-            // nothing else on the machine would send them to, and a user who
-            // granted this and still had a key that did nothing would have no
-            // way of guessing why.
-            "You dictate on the Globe key, and macOS does not hand that one to apps the way "
-                + "it hands over every other key. It also needs System Settings › Keyboard › "
-                + "“Press 🌐 key to” set to “Do Nothing”, or macOS acts on the press before "
-                + "Cheppu sees it."
-        case .microphone:
-            "Cheppu hears you only while you are dictating."
-        }
     }
 }
