@@ -11,17 +11,14 @@ struct HotkeyGestureTests {
     private static let hotkeyDown = KeyStroke.modifiersHeld([.rightOption])
     private static let everythingUp = KeyStroke.modifiersHeld([])
 
-    /// Everything a run of keystrokes reported.
-    private static func reported(from strokes: [KeyStroke]) -> [HotkeyEvent] {
-        var gesture = HotkeyGesture()
+    /// Everything a run of keystrokes reported, to whichever Hotkey the user
+    /// chose. The default unless a test says otherwise, because it is what
+    /// nearly everybody is holding.
+    private static func reported(
+        from strokes: [KeyStroke], watchingFor hotkey: Hotkey = .byDefault
+    ) -> [HotkeyEvent] {
+        var gesture = HotkeyGesture(watchingFor: hotkey)
         return strokes.compactMap { gesture.seeing($0) }
-    }
-
-    @Test("The Hotkey is the right Option key on its own")
-    func theHotkeyIsTheRightOptionKeyOnItsOwn() {
-        // The default, because it does nothing on its own in any app: turning
-        // Cheppu on takes no shortcut away from anyone.
-        #expect(HotkeyGesture.hotkey == [.rightOption])
     }
 
     @Test("The Hotkey going down is reported as it goes down, not when it comes back up")
@@ -146,6 +143,123 @@ struct HotkeyGestureTests {
         ]
 
         #expect(Self.reported(from: strokes) == [.pressed, .pressSpoiled, .pressed, .released])
+    }
+
+    // MARK: - A Hotkey the user chose
+
+    @Test("A bare modifier the user chose is watched in place of the default")
+    func aBareModifierTheUserChoseIsWatchedInPlaceOfTheDefault() {
+        let strokes: [KeyStroke] = [.modifiersHeld([.leftControl]), Self.everythingUp]
+
+        #expect(Self.reported(from: strokes, watchingFor: .bareModifier(.leftControl))
+            == [.pressed, .released])
+        // And the key that used to be the Hotkey is now somebody else's.
+        #expect(Self.reported(from: [Self.hotkeyDown, Self.everythingUp],
+            watchingFor: .bareModifier(.leftControl)).isEmpty)
+    }
+
+    @Test("The Globe key on its own is a Hotkey like any other")
+    func theGlobeKeyOnItsOwnIsAHotkeyLikeAnyOther() {
+        // What it costs is a permission and a macOS setting, said where it is
+        // chosen. By the time a stroke reaches here it is one more modifier.
+        let strokes: [KeyStroke] = [.modifiersHeld([.function]), Self.everythingUp]
+
+        #expect(Self.reported(from: strokes, watchingFor: .bareModifier(.function))
+            == [.pressed, .released])
+    }
+
+    // MARK: - A chord
+
+    private static let chord = Hotkey.chord(Key(named: "D")!, with: [.leftControl, .leftOption])
+    private static let chordHeld = KeyStroke.modifiersHeld([.leftControl, .leftOption])
+
+    @Test("A chord is pressed when its key is struck with exactly its modifiers held")
+    func aChordIsPressedWhenItsKeyIsStruckWithExactlyItsModifiersHeld() {
+        let strokes: [KeyStroke] = [Self.chordHeld, .hotkeyKeyPressed, .hotkeyKeyReleased]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
+    @Test("The chord's key struck without its modifiers is the user typing")
+    func theChordsKeyStruckWithoutItsModifiersIsTheUserTyping() {
+        // Somebody typing the word "and" is striking the same key. Nothing is
+        // reported, and there is no Dictation to take back.
+        let strokes: [KeyStroke] = [.hotkeyKeyPressed, .hotkeyKeyReleased]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord).isEmpty)
+    }
+
+    @Test("A chord struck with something extra held is a different chord")
+    func aChordStruckWithSomethingExtraHeldIsADifferentChord() {
+        // Control-Option-Shift-D is somebody else's shortcut, and Cheppu is not
+        // in it.
+        let strokes: [KeyStroke] = [
+            .modifiersHeld([.leftControl, .leftOption, .leftShift]),
+            .hotkeyKeyPressed,
+            .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord).isEmpty)
+    }
+
+    @Test("Leaning on a chord repeats the key and starts one Dictation")
+    func leaningOnAChordRepeatsTheKeyAndStartsOneDictation() {
+        // A key held down repeats, which is what a Hold on a chord looks like
+        // for as long as it lasts. Only the first of them started anything.
+        let strokes: [KeyStroke] = [
+            Self.chordHeld, .hotkeyKeyPressed, .hotkeyKeyPressed, .hotkeyKeyPressed,
+            .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
+    @Test("Letting go of a chord's modifier first ends the press")
+    func lettingGoOfAChordsModifierFirstEndsThePress() {
+        // The hand comes off a chord one key at a time, and whichever key it
+        // leaves first ends the Hold. Waiting for the key itself would leave a
+        // Dictation running on past the words.
+        let strokes: [KeyStroke] = [
+            Self.chordHeld,
+            .hotkeyKeyPressed,
+            .modifiersHeld([.leftControl]),
+            .hotkeyKeyReleased,
+            Self.everythingUp,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
+    @Test("A key brushed during a Hold on a chord does not take the Dictation back")
+    func aKeyBrushedDuringAHoldOnAChordDoesNotTakeTheDictationBack() {
+        // A bare modifier is ambiguous until the next keystroke settles it. A
+        // chord never was: they held Control-Option and struck D, which is not
+        // something anybody does on the way to typing. So what they said is
+        // kept, exactly as it would be during any other Dictation.
+        let strokes: [KeyStroke] = [
+            Self.chordHeld, .hotkeyKeyPressed, .keyPressed, .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord) == [.pressed, .released])
+    }
+
+    @Test("Escape during a Hold on a chord Cancels it")
+    func escapeDuringAHoldOnAChordCancelsIt() {
+        let strokes: [KeyStroke] = [
+            Self.chordHeld, .hotkeyKeyPressed, .escapePressed, .hotkeyKeyReleased,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord)
+            == [.pressed, .escapePressed, .released])
+    }
+
+    @Test("Ordinary typing is never reported to a chord either")
+    func ordinaryTypingIsNeverReportedToAChordEither() {
+        let strokes: [KeyStroke] = [
+            .keyPressed, .modifiersHeld([.leftShift]), .keyPressed, Self.everythingUp,
+        ]
+
+        #expect(Self.reported(from: strokes, watchingFor: Self.chord).isEmpty)
     }
 
     // MARK: - Escape

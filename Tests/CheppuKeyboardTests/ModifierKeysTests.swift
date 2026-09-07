@@ -1,12 +1,13 @@
+import CheppuCore
 import CoreGraphics
 import Testing
 
 @testable import CheppuKeyboard
 
-// Which keys an event says are held. The Hotkey is one particular key, and this
-// is where a Mac's answer to "which Option key was that?" is read — including
-// the answers that would quietly stop the Hotkey working if they were read
-// wrong.
+// Which keys an event says are held. The Hotkey may be one particular key, and
+// this is where a Mac's answer to "which Option key was that?" is read —
+// including the answers that would quietly stop the Hotkey working if they were
+// read wrong.
 @Suite("Modifier keys")
 struct ModifierKeysTests {
     /// The device-dependent bits macOS sets alongside the flag for a modifier,
@@ -18,8 +19,8 @@ struct ModifierKeysTests {
         static let rightOption: UInt64 = 0x0000_0040
     }
 
-    private static func held(_ flags: CGEventFlags, andSides sides: UInt64 = 0) -> ModifierKeys {
-        ModifierKeys(CGEventFlags(rawValue: flags.rawValue | sides))
+    private static func held(_ flags: CGEventFlags, andSides sides: UInt64 = 0) -> Set<Modifier> {
+        Modifier.held(in: CGEventFlags(rawValue: flags.rawValue | sides))
     }
 
     @Test("The right Option key is told apart from the left one")

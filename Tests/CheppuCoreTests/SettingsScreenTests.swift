@@ -8,6 +8,8 @@ import Testing
 @Suite("Settings screen")
 struct SettingsScreenTests {
     private static func screen(
+        hotkey: Hotkey = .byDefault,
+        isChoosingAHotkey: Bool = false,
         cleanup: CleanupRules = .all,
         areCuesOn: Bool = true,
         launchesAtLogin: Bool = false,
@@ -16,6 +18,8 @@ struct SettingsScreenTests {
         ]
     ) -> SettingsScreen {
         SettingsScreen(
+            hotkey: hotkey,
+            isChoosingAHotkey: isChoosingAHotkey,
             cleanup: cleanup,
             areCuesOn: areCuesOn,
             launchesAtLogin: launchesAtLogin,
@@ -23,15 +27,24 @@ struct SettingsScreenTests {
         )
     }
 
+    /// Which permissions the screen has a row for, in the order they are read.
+    private static func permissionsOn(_ screen: SettingsScreen) -> [Permission] {
+        screen.controls.compactMap { control in
+            guard case .permission(let permission, _) = control else { return nil as Permission? }
+            return permission
+        }
+    }
+
     @Test("Everything the user can set is on the one screen")
     func everythingTheUserCanSetIsOnTheOneScreen() {
-        // The whole of `docs/product-experience.md` §11 bar the Hotkey, which
-        // is #16's: three Cleanup switches, the Cues, launch at login, both
-        // permissions, and History. Written out here rather than counted,
+        // The whole of `docs/product-experience.md` §11: the Hotkey, three
+        // Cleanup switches, the Cues, launch at login, the permissions this
+        // Hotkey needs, and History. Written out here rather than counted,
         // because a setting that quietly stopped being shown is a setting the
         // user has to go looking for in a menu that does not have it either.
         #expect(
             Self.screen(cleanup: .all, areCuesOn: true, launchesAtLogin: true).controls == [
+                .hotkey(.byDefault, isBeingChosen: false),
                 .cleanupRule(.removesFillerWords, isOn: true),
                 .cleanupRule(.capitalisesSentences, isOn: true),
                 .cleanupRule(.breaksParagraphs, isOn: true),
@@ -57,6 +70,63 @@ struct SettingsScreenTests {
         }
 
         #expect(switched == CleanupRule.allCases)
+    }
+
+    // MARK: - The Hotkey
+
+    @Test("The Hotkey is on the screen, and says which key it is")
+    func theHotkeyIsOnTheScreenAndSaysWhichKeyItIs() {
+        // The user opens Settings to find out what they set it to as often as
+        // to change it, so the row reads back the key rather than only offering
+        // to take a new one.
+        let chord = Hotkey.chord(Key(named: "D")!, with: [.leftControl, .leftOption])
+        let screen = Self.screen(hotkey: chord)
+
+        #expect(screen.controls.contains(.hotkey(chord, isBeingChosen: false)))
+        #expect(SettingsControl.hotkey(chord, isBeingChosen: false).reading == "⌃⌥D")
+        #expect(SettingsControl.hotkey(chord, isBeingChosen: false).action != nil)
+        #expect(SettingsControl.hotkey(chord, isBeingChosen: false).isOn == nil)
+    }
+
+    @Test("The row says when it is listening, rather than taking a keystroke without warning")
+    func theRowSaysWhenItIsListening() {
+        let listening = Self.screen(hotkey: .byDefault, isChoosingAHotkey: true)
+        let waiting = SettingsControl.hotkey(.byDefault, isBeingChosen: true)
+
+        #expect(listening.controls.contains(waiting))
+        // And the same button is the way out of it, so a user who clicked
+        // "Change…" by accident is not stuck holding a keyboard.
+        #expect(waiting.action == "Cancel")
+        #expect(waiting.reading != Hotkey.byDefault.name)
+    }
+
+    @Test("Input Monitoring is shown only when the chosen Hotkey needs it")
+    func inputMonitoringIsShownOnlyWhenTheChosenHotkeyNeedsIt() {
+        // Cheppu asks for no permission the Hotkey does not actually need, and
+        // a row offering the way to a pane the user has no reason to visit is
+        // the screen asking for one.
+        let onTheDefault = Self.screen(hotkey: .byDefault)
+        let onTheGlobeKey = Self.screen(
+            hotkey: .bareModifier(.function),
+            permissions: [
+                .microphone: .granted, .accessibility: .granted, .inputMonitoring: .notGranted,
+            ]
+        )
+
+        #expect(Self.permissionsOn(onTheDefault) == [.microphone, .accessibility])
+        #expect(
+            Self.permissionsOn(onTheGlobeKey) == [.microphone, .accessibility, .inputMonitoring]
+        )
+        #expect(onTheGlobeKey.controls.contains(.permission(.inputMonitoring, .notGranted)))
+    }
+
+    @Test("A permission nobody answered for is shown as not granted rather than left out")
+    func aPermissionNobodyAnsweredForIsShownAsNotGranted() {
+        // The row the user came to check is the one that must not quietly go
+        // missing.
+        #expect(
+            Self.screen(permissions: [:]).controls.contains(.permission(.microphone, .notGranted))
+        )
     }
 
     @Test("A switch says which way the user left it")
@@ -140,7 +210,7 @@ struct SettingsScreenTests {
 
         #expect(
             screen.sections.map(\.title) == [
-                "Cleanup", "Sounds", "Startup", "Permissions", "History",
+                "Hotkey", "Cleanup", "Sounds", "Startup", "Permissions", "History",
             ]
         )
         #expect(screen.sections.allSatisfy { !$0.controls.isEmpty })

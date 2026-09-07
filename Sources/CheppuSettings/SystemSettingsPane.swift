@@ -19,6 +19,9 @@ public enum SystemSettingsPane {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
         case .accessibility:
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        // What macOS calls Input Monitoring in its own address for the pane.
+        case .inputMonitoring:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
         }
     }
 }
@@ -34,4 +37,14 @@ public protocol Permissions: Sendable {
     /// Whether Cheppu has this permission, answered from the decision already
     /// on record and without prompting for anything.
     func status(of permission: Permission) -> PermissionStatus
+
+    /// Asks macOS for a permission that has a prompt of its own, at the moment
+    /// the user's own choice has made it necessary and at no other.
+    ///
+    /// Only Input Monitoring is ever asked for this way, and only by somebody
+    /// who has just chosen the Globe key. The Microphone is asked for by the
+    /// first Dictation that needs it, and Accessibility has no prompt at all —
+    /// it is a switch in System Settings, which is what the button beside it is
+    /// for.
+    func ask(for permission: Permission)
 }

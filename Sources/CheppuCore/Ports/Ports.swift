@@ -55,6 +55,16 @@ public protocol HotkeyPort: Sendable {
     func observe(_ handler: @escaping @Sendable (HotkeyEvent) async -> Void) async throws
 }
 
+/// Which key the user dictates with.
+///
+/// Read rather than held, exactly as the Cue switch and the Cleanup rules are,
+/// and read at the moment watching starts rather than at launch (ADR-0010).
+/// Changing the Hotkey is therefore a matter of watching again with what the
+/// user just chose, and takes effect on the very next press.
+public protocol HotkeyChoice: Sendable {
+    func hotkey() async -> Hotkey
+}
+
 /// The microphone.
 public protocol AudioCapturePort: Sendable {
     /// Begins capturing, reporting how loud it is hearing as it goes. Called

@@ -19,11 +19,12 @@ extension CleanupRule {
 
 /// A permission macOS will not let Cheppu take for itself.
 ///
-/// Two, and the app says what each is for in one line at the moment it is
-/// needed (`docs/product-experience.md` §9). Settings is the other moment: the
-/// user is looking at Cheppu on purpose, and what they want to know is whether
-/// the thing they granted last month is still granted.
-public enum Permission: CaseIterable, Equatable, Sendable {
+/// Three at most, and never more than the chosen Hotkey actually needs: the app
+/// says what each is for in one line at the moment it is needed
+/// (`docs/product-experience.md` §9). Settings is the other moment: the user is
+/// looking at Cheppu on purpose, and what they want to know is whether the
+/// thing they granted last month is still granted.
+public enum Permission: CaseIterable, Equatable, Hashable, Sendable {
     /// To hear the user. Asked for by macOS, inside a prompt, the first time a
     /// Dictation needs it.
     case microphone
@@ -32,12 +33,28 @@ public enum Permission: CaseIterable, Equatable, Sendable {
     /// There is no prompt for this one — it is a switch in System Settings.
     case accessibility
 
+    /// To see the Globe key, which macOS does not hand to apps the way it hands
+    /// over every other key. Asked for only by a Hotkey that uses it, and by no
+    /// other: a permission Cheppu does not need is one it does not ask for.
+    case inputMonitoring
+
+    /// The permissions a Hotkey costs the user, in the order they are read.
+    ///
+    /// Here rather than `allCases` because the answer depends on the key they
+    /// chose. Somebody dictating on the right Option key has no reason ever to
+    /// see Input Monitoring, and a row offering the way to a pane they do not
+    /// need is the screen asking for something on Cheppu's behalf.
+    public static func neededBy(_ hotkey: Hotkey) -> [Permission] {
+        [.microphone, .accessibility] + (hotkey.needsInputMonitoring ? [.inputMonitoring] : [])
+    }
+
     /// What macOS calls it, so that the name on the screen is the name on the
     /// pane the button opens.
     public var name: String {
         switch self {
         case .microphone: "Microphone"
         case .accessibility: "Accessibility"
+        case .inputMonitoring: "Input Monitoring"
         }
     }
 
@@ -46,6 +63,7 @@ public enum Permission: CaseIterable, Equatable, Sendable {
         switch self {
         case .microphone: "Cheppu hears you only while you are dictating."
         case .accessibility: "Lets the hotkey work in other apps, and types what you said."
+        case .inputMonitoring: "Lets Cheppu see the Globe key, which macOS hides from apps."
         }
     }
 }
@@ -75,6 +93,14 @@ public enum PermissionStatus: Equatable, Sendable {
 /// button does. Nothing here draws anything — the app renders these, exactly as
 /// it renders `MenuBarItem`.
 public enum SettingsControl: Equatable, Sendable {
+    /// The key the user dictates with, and the way to choose another
+    /// (`docs/product-experience.md` §6).
+    ///
+    /// It says whether the window is waiting for a key this instant, because a
+    /// row that looked the same while it was listening would be one that took
+    /// the user's next keystroke without warning.
+    case hotkey(Hotkey, isBeingChosen: Bool)
+
     /// One Cleanup rule, and which way the user has it. Every rule has one,
     /// because off has to be a real option for each
     /// (`docs/product-experience.md` §8).
@@ -98,6 +124,7 @@ public enum SettingsControl: Equatable, Sendable {
     /// The line the user reads.
     public var title: String {
         switch self {
+        case .hotkey: "Hotkey"
         case .cleanupRule(let rule, _): rule.title
         // "Sounds" rather than "Cues", as in the menu: the glossary is what the
         // code calls them, and this line is read by someone who has never seen
@@ -117,6 +144,13 @@ public enum SettingsControl: Equatable, Sendable {
     /// there is nowhere here to write one.
     public var explanation: String? {
         switch self {
+        // Both gestures in one line, because the second one is the half nobody
+        // discovers on their own (`docs/product-experience.md` §6).
+        case .hotkey(_, isBeingChosen: false):
+            "Tap it to start and stop, or hold it down to dictate while held."
+        // What the user may press, said while they are deciding what to press.
+        case .hotkey(_, isBeingChosen: true):
+            "Hold one modifier on its own, or strike a key with modifiers held."
         case .cleanupRule(.removesFillerWords, _): "Drops “um” and “uh”, and nothing else."
         case .cleanupRule(.capitalisesSentences, _), .cleanupRule(.breaksParagraphs, _): nil
         case .cues: "A short sound when a dictation starts, stops or is cancelled."
@@ -132,7 +166,22 @@ public enum SettingsControl: Equatable, Sendable {
     public var isOn: Bool? {
         switch self {
         case .cleanupRule(_, let isOn), .cues(let isOn), .launchAtLogin(let isOn): isOn
-        case .permission, .history: nil
+        case .hotkey, .permission, .history: nil
+        }
+    }
+
+    /// What the row reads this instant, where it reports something as well as
+    /// offering to change it: the key the user chose, and whether macOS still
+    /// says Cheppu has a permission.
+    ///
+    /// Decided here rather than by the window, so that what a row says and what
+    /// it is are the same answer.
+    public var reading: String? {
+        switch self {
+        case .hotkey(_, isBeingChosen: true): "Listening…"
+        case .hotkey(let hotkey, _): hotkey.name
+        case .permission(_, let status): status.name
+        case .cleanupRule, .cues, .launchAtLogin, .history: nil
         }
     }
 
@@ -145,6 +194,11 @@ public enum SettingsControl: Equatable, Sendable {
     /// would be a screen that could be read and not acted on.
     public var action: String? {
         switch self {
+        // The ellipsis says it asks for something: the window waits for the key
+        // the user presses next rather than doing anything the moment it is let
+        // go of. While it is waiting, the same button is the way out of it.
+        case .hotkey(_, isBeingChosen: false): "Change…"
+        case .hotkey(_, isBeingChosen: true): "Cancel"
         case .permission: "Open System Settings…"
         // No ellipsis: nothing is asked first. Somebody reaching for this has
         // had someone walk up behind them (`docs/product-experience.md` §10).
@@ -160,8 +214,6 @@ public enum SettingsControl: Equatable, Sendable {
 /// window this describes has no tabs, because a setting behind a tab is one the
 /// user has to go looking for, and the whole of what Cheppu can be set to is
 /// eleven lines (`docs/product-experience.md` §11).
-///
-/// The Hotkey joins it in #16, which is the last of the MVP's settings.
 public struct SettingsScreen: Equatable, Sendable {
     /// A heading and the rows under it. A section groups rows on the one
     /// screen; it never hides them.
@@ -189,6 +241,15 @@ public struct SettingsScreen: Equatable, Sendable {
     }
 
     /// - Parameters:
+    ///   - isChoosingAHotkey: whether the window is waiting for the user to
+    ///     press the key they want. The row says so while it is, because one
+    ///     that looked the same either way would take their next keystroke
+    ///     without warning.
+    ///   - hotkey: the key the user dictates with. It decides its own row and
+    ///     which permissions have one: Input Monitoring is on the screen only
+    ///     while the chosen key needs it, because a row offering the way to a
+    ///     pane the user has no reason to visit is Cheppu asking for a
+    ///     permission it does not need.
     ///   - cleanup: which Cleanup rules the user has on.
     ///   - areCuesOn: whether a Dictation makes a sound.
     ///   - launchesAtLogin: whether macOS starts Cheppu when the user logs in.
@@ -198,12 +259,18 @@ public struct SettingsScreen: Equatable, Sendable {
     ///     nobody answered for is shown as not granted: a row that quietly went
     ///     missing would be the one the user came to check.
     public init(
+        hotkey: Hotkey,
+        isChoosingAHotkey: Bool = false,
         cleanup: CleanupRules,
         areCuesOn: Bool,
         launchesAtLogin: Bool,
         permissions: [Permission: PermissionStatus]
     ) {
         self.sections = [
+            Section(
+                title: "Hotkey",
+                controls: [.hotkey(hotkey, isBeingChosen: isChoosingAHotkey)]
+            ),
             Section(
                 title: "Cleanup",
                 controls: CleanupRule.allCases.map { .cleanupRule($0, isOn: cleanup[$0]) }
@@ -212,7 +279,7 @@ public struct SettingsScreen: Equatable, Sendable {
             Section(title: "Startup", controls: [.launchAtLogin(isOn: launchesAtLogin)]),
             Section(
                 title: "Permissions",
-                controls: Permission.allCases.map {
+                controls: Permission.neededBy(hotkey).map {
                     .permission($0, permissions[$0] ?? .notGranted)
                 }
             ),

@@ -33,7 +33,8 @@ Press Escape while listening to cancel: the audio is thrown away and nothing is 
 - A five-minute cap per dictation, so a forgotten toggle cannot record forever.
 - A recording pill with input level, plus start and stop sounds that can be turned off from the menu bar ([ADR-0007](./docs/adr/0007-the-cues-can-be-silenced-and-the-pill-cannot.md)).
 - Text-only History of the last 100 dictations, opened from the menu bar, copied one at a time and cleared in one action. It is one file under `~/Library/Application Support/Cheppu/`, readable by nobody but you ([ADR-0009](./docs/adr/0009-history-is-a-file-of-its-own-not-a-preference.md)). Every dictation is written to it before insertion is attempted, so a failure on the way out costs you nothing. Audio is discarded after transcription.
-- A settings window that fits on one screen, opened from the menu bar: the cleanup toggles, sounds, launch at login, what macOS says about each permission, and History's one clear action. No tabs, no OK button — every switch takes effect where you flick it and is read again by the next dictation ([ADR-0010](./docs/adr/0010-settings-are-read-where-they-are-used.md)). The hotkey control joins it next.
+- A settings window that fits on one screen, opened from the menu bar: the hotkey, the cleanup toggles, sounds, launch at login, what macOS says about each permission your hotkey needs, and History's one clear action. No tabs, no OK button — every switch takes effect where you flick it and is read again by the next dictation ([ADR-0010](./docs/adr/0010-settings-are-read-where-they-are-used.md)).
+- A configurable hotkey: any bare modifier, or any chord. Press "Change…" and press the key you want. It works on the very next press, in whatever app you are in, and survives a relaunch. Pick a chord macOS already uses and Cheppu says what macOS does with it before it takes it — you would get both, because Cheppu cannot take a keystroke from another app ([ADR-0006](./docs/adr/0006-escape-cancels-a-dictation-without-taking-the-key.md)). Only the one key you chose is ever told apart from the ones you type ([ADR-0011](./docs/adr/0011-one-question-of-a-key-and-only-the-one-the-user-chose.md)).
 - Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command. An emulator Cheppu has never heard of is treated as one too ([ADR-0008](./docs/adr/0008-terminals-are-found-by-what-a-text-surface-looks-like.md)).
 - A first-run flow that requests permissions, downloads the model, and has you dictate one sentence before you use it anywhere else.
 - Signed and notarized builds via GitHub Releases and Homebrew, with in-app updates via Sparkle.
@@ -58,14 +59,14 @@ Each of these is a real feature that a real user wants. They are out because eac
 
 ## Permissions
 
-Cheppu asks for two permissions, each with a one-line reason at the moment it is needed:
+Cheppu asks for two permissions, each with a one-line reason at the moment it is needed — and for a third only if the hotkey you chose needs it:
 
 - **Microphone**: to hear you, asked for by the first dictation that needs it.
 - **Accessibility**: to insert text into other apps and to see the hotkey while another app has focus. macOS has no prompt for this one — it is a switch in System Settings — so Cheppu says why in one line and opens the right pane for you. Until it is granted, the menu bar menu says the hotkey cannot work rather than leaving you with a key that does nothing.
 
 Settings says what macOS currently thinks of each of them, without you having to start a dictation to find out, and puts a button next to any it does not have that opens the right pane.
 
-Choosing the Fn/Globe key as your hotkey adds one more, Input Monitoring, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing". Cheppu explains both at the moment you choose that key, not before.
+Choosing the Fn/Globe key as your hotkey adds one more, **Input Monitoring**, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing" — without both, macOS acts on the press before Cheppu ever sees it. Cheppu explains both at the moment you choose that key, not before, and asks for Input Monitoring then and never otherwise. On any other hotkey it is not asked for, not mentioned, and not a row in Settings.
 
 ## Building
 

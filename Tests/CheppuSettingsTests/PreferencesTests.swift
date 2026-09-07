@@ -17,6 +17,55 @@ struct PreferencesTests {
         test(Preferences(in: defaults), defaults)
     }
 
+    // MARK: - The Hotkey
+
+    @Test("A fresh install dictates on the right Option key")
+    func aFreshInstallDictatesOnTheRightOptionKey() {
+        Self.inADomainOfItsOwn { preferences, _ in
+            #expect(preferences.hotkey() == .byDefault)
+        }
+    }
+
+    @Test("The Hotkey the user chose is what the next launch watches for")
+    func theHotkeyTheUserChoseIsWhatTheNextLaunchWatchesFor() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            let chord = Hotkey.chord(Key(named: "D")!, with: [.leftControl, .leftOption])
+            preferences.choose(chord)
+
+            #expect(Preferences(in: defaults).hotkey() == chord)
+        }
+    }
+
+    @Test("A bare modifier survives a relaunch as the key it was")
+    func aBareModifierSurvivesARelaunchAsTheKeyItWas() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            preferences.choose(.bareModifier(.function))
+
+            #expect(Preferences(in: defaults).hotkey() == .bareModifier(.function))
+        }
+    }
+
+    @Test("A Hotkey nothing can read leaves the user dictating rather than stuck")
+    func aHotkeyNothingCanReadLeavesTheUserDictating() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            // A domain edited by hand, or written by a version that spelled it
+            // differently. The alternative to falling back is an app whose key
+            // does nothing and that never says why.
+            defaults.set("something nobody wrote", forKey: Preferences.Key.hotkey)
+
+            #expect(preferences.hotkey() == .byDefault)
+        }
+    }
+
+    @Test("Reading the Hotkey nobody has chosen writes nothing")
+    func readingTheHotkeyNobodyHasChosenWritesNothing() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            _ = preferences.hotkey()
+
+            #expect(defaults.object(forKey: Preferences.Key.hotkey) == nil)
+        }
+    }
+
     @Test("A fresh install cleans up what was said, and can be heard")
     func aFreshInstallCleansUpAndCanBeHeard() {
         Self.inADomainOfItsOwn { preferences, _ in
