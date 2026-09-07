@@ -27,6 +27,24 @@ import CheppuCore
 ///
 /// It is drawn by hand for the same reason the menu bar icon is: the bundle is
 /// assembled by `Scripts/make-app.sh` and has nowhere to keep an asset.
+/// How a notice is set, and how much of the Pill it is allowed.
+///
+/// What it says is `PillState.words`, decided in the core: the words a user
+/// reads and the pane a button opens about the same moment are chosen from the
+/// same answer, and there is no sentence about Cheppu kept in a view.
+///
+/// The size is what fits the longest thing the Pill ever says — "Cheppu needs
+/// Input Monitoring", over two lines — inside the Pill it is in every other
+/// state. One that grew for a message would be a shape that moved while being
+/// read. `PillNoticeTests` is what holds that to be true rather than this
+/// sentence, which is the whole reason these two sit out here rather than with
+/// the rest of `PillView`'s measurements: a view is the main actor's, and what
+/// measures the words is not drawing them.
+enum PillNotice {
+    static let size: CGFloat = 13
+    static let inset: CGFloat = 10
+}
+
 final class PillView: NSView {
     /// The dark capsule everything is drawn on. Cheppu picks the colour rather
     /// than following the system's, because the Pill floats over other apps'
@@ -43,20 +61,6 @@ final class PillView: NSView {
     private static let barGap: CGFloat = 5
     private static let shortestBar: CGFloat = 5
 
-    /// How a notice is set, and how much of the Pill it is allowed.
-    ///
-    /// What it says is `PillState.words`, decided in the core: the words a user
-    /// reads here and the pane a button opens about the same moment are chosen
-    /// from the same answer, and there is no sentence about Cheppu kept in a
-    /// view.
-    ///
-    /// The size is what fits the longest thing the Pill ever says — "Cheppu
-    /// needs Input Monitoring", over two lines — inside the Pill it is in every
-    /// other state. One that grew for a message would be a shape that moved
-    /// while being read. `PillNoticeTests` is what holds that to be true rather
-    /// than this sentence.
-    static let noticeSize: CGFloat = 13
-    static let noticeInset: CGFloat = 10
 
     /// The mark that sweeps while the Engine works, and the track it runs in.
     private static let sweepLength: CGFloat = 38
@@ -169,13 +173,13 @@ final class PillView: NSView {
         let notice = NSAttributedString(
             string: words,
             attributes: [
-                .font: NSFont.systemFont(ofSize: Self.noticeSize, weight: .medium),
+                .font: NSFont.systemFont(ofSize: PillNotice.size, weight: .medium),
                 .foregroundColor: Self.ink,
                 .paragraphStyle: centred,
             ]
         )
 
-        let room = bounds.insetBy(dx: Self.noticeInset, dy: 0)
+        let room = bounds.insetBy(dx: PillNotice.inset, dy: 0)
         let wrapped = notice.boundingRect(
             with: NSSize(width: room.width, height: .greatestFiniteMagnitude),
             options: .usesLineFragmentOrigin
