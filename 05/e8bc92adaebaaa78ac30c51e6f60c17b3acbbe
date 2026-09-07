@@ -1,0 +1,21 @@
+Sources/CheppuFeedback/PillView.swift
+  s_c781002de41942::t_001a30f5345fcf 30-47,176,182
+Tests/CheppuFeedbackTests/PillNoticeTests.swift
+  s_c781002de41942::t_b8a96051c37280 7-11,24,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "05e8bc92adaebaaa78ac30c51e6f60c17b3acbbe",
+  "prompts": {},
+  "sessions": {
+    "s_c781002de41942": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3064f1-6b53-44b1-8c5e-73e686cbd631",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
