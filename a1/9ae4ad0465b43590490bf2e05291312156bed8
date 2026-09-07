@@ -1,0 +1,88 @@
+Sources/CheppuCore/Diagnostics/FailureName.swift
+  s_f19f7ee5660821::t_199c9be9a6106d 1-55
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_f19f7ee5660821::t_6511f619845630 1135-1161,1164-1167,1172,1174-1259
+  s_f19f7ee5660821::t_cf23df3a7bbcd5 1162-1163,1168-1171
+  s_f19f7ee5660821::t_c68622873d9033 52,66,75,77,89,95-96
+  s_f19f7ee5660821::t_3ed727dc6c38b8 1173
+Sources/CheppuCore/Ports/Ports.swift
+  s_f19f7ee5660821::t_3cb6df5a91599e 266-281,285-291
+  s_f19f7ee5660821::t_5810ed6f6f5ab2 282-284
+Package.swift
+  s_f19f7ee5660821::t_42e98b228c1e00 73-85,113,156-160
+README.md
+  s_f19f7ee5660821::t_5810ed6f6f5ab2 41
+Sources/CheppuDiagnostics/DiagnosticsLog.swift
+  s_f19f7ee5660821::t_af778fe9ff5473 30-33,81-91,93-95,97,120,123-131,143-146
+  s_f19f7ee5660821::t_8b263429754181 38-41,92
+  s_f19f7ee5660821::t_858b3263baccc8 66-68
+  s_f19f7ee5660821::t_f0fe6152305e90 179-187
+  s_f19f7ee5660821::t_00be80cccb48ea 106-107,110-119,121-122,132-133
+  s_f19f7ee5660821::t_43a434b43630fd 193,200-208,215-224,227-234
+  s_f19f7ee5660821::t_6c7c077f4f8fa3 1-29,34-37,42-48,50-65,69-80,96,98-105,108-109,134-142,147-178,188-192,194-199,209-214,225-226,235-258
+  s_f19f7ee5660821::t_a7514532ae3c36 49
+Sources/Cheppu/UnbuiltPorts.swift
+  s_f19f7ee5660821::t_6fc899a2cfc7fb 20-21
+Sources/CheppuEngine/ParakeetEngine.swift
+  s_f19f7ee5660821::t_08f33d293f9a97 12-17
+Sources/CheppuDiagnostics/WrittenLine.swift
+  s_f19f7ee5660821::t_af778fe9ff5473 67-68
+  s_f19f7ee5660821::t_8331a7a85743a3 1-36,39-44,46-66,69-97,101-103
+  s_f19f7ee5660821::t_858b3263baccc8 37-38,45
+  s_f19f7ee5660821::t_0b02a4f44ca346 98-100
+docs/adr/0012-the-log-is-told-rather-than-asked.md
+  s_f19f7ee5660821::t_e399415fbebc46 1-38
+Tests/CheppuDiagnosticsTests/DiagnosticsLogTests.swift
+  s_f19f7ee5660821::t_c2e937fff21f02 235-255,273-274
+  s_f19f7ee5660821::t_d5566768231ed6 137-138,270-272
+  s_f19f7ee5660821::t_a7514532ae3c36 167-182,197-220,257-269
+  s_f19f7ee5660821::t_be9c3c2a0cbd3a 68-69,76,85-86,96,106-107,118,126-127,145-146,158-159,223-224,231-232
+  s_f19f7ee5660821::t_bbf864f2197f57 61-65,256
+  s_f19f7ee5660821::t_cf23df3a7bbcd5 47-56,119
+  s_f19f7ee5660821::t_c384221c962af1 12-18,20-29,57
+  s_f19f7ee5660821::t_04256856588270 1-11,19,30-46,58-60,66-67,70-75,77-84,87-95,97-105,108-117,120-125,128-136,139-144,147-157,160-166,221-222,225-230,233-234,275-288
+  s_f19f7ee5660821::t_f45ad585800f29 183-196
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_f19f7ee5660821::t_64cfe68e8722cb 2,414-434
+  s_f19f7ee5660821::t_cf23df3a7bbcd5 208-224
+  s_f19f7ee5660821::t_b66dc42135e57c 135-149,152,155
+  s_f19f7ee5660821::t_5ae19258bdd1e9 435
+Sources/CheppuCore/Diagnostics/DiagnosticNote.swift
+  s_f19f7ee5660821::t_fc33416acee01a 1-15,18-63,74-112,122-142,146-149
+  s_f19f7ee5660821::t_af778fe9ff5473 64-73
+  s_f19f7ee5660821::t_0b02a4f44ca346 113-121,143-145
+  s_f19f7ee5660821::t_5810ed6f6f5ab2 16-17
+.github/workflows/ci.yml
+  s_f19f7ee5660821::t_1ca6e052d30919 54-56
+Sources/Cheppu/MenuBarController.swift
+  s_f19f7ee5660821::t_42e98b228c1e00 4,52-57,153-154
+Sources/CheppuDiagnostics/DiagnosticsFile.swift
+  s_f19f7ee5660821::t_fd9fd4b682f252 1-64
+Scripts/check-the-log-says-nothing-of-what-was-said.sh
+  s_f19f7ee5660821::t_efd0e2534d30c5 79-92
+  s_f19f7ee5660821::t_de044e7376c77b 21-24,57-58,74-75,96-97,126-127,146-161,170-171,179-180
+  s_f19f7ee5660821::t_f1159a0caaf1f1 41-43,66-68,99-119,132-134,142-144
+  s_f19f7ee5660821::t_99d52e6a454b37 1-20,25-40,44-56,59-65,69-73,76-78,93-95,98,120-125,128-131,135-141,145,162-169,172-178,181-182
+CONTEXT.md
+  s_f19f7ee5660821::t_13a03302a07862 123,125-126
+  s_f19f7ee5660821::t_5810ed6f6f5ab2 124
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_f19f7ee5660821::t_f0fe6152305e90 188-189,223-224,240,242-244,246-250
+  s_f19f7ee5660821::t_e7878e63627808 31,44-46,57-58,71,81-91,93,176-180,190,196-198,205-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "a19ae4ad0465b43590490bf2e05291312156bed8",
+  "prompts": {},
+  "sessions": {
+    "s_f19f7ee5660821": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f69107-b42b-43ea-900f-4ad78d4d80d6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
