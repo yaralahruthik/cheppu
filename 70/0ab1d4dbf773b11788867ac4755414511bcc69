@@ -1,0 +1,82 @@
+Tests/CheppuCoreTests/DictationMachineTests.swift
+  s_c781002de41942::t_7dab750423e962 883-961
+Sources/CheppuCore/Dictation/DictationMachine.swift
+  s_c781002de41942::t_9ff52e3bed0a82 121-125,127-138,141,183-193,523-536,545-556
+  s_c781002de41942::t_4cfbca8ce3f544 557
+  s_c781002de41942::t_81c66cdf824a8c 139-140
+  s_c781002de41942::t_74d765d12c272e 537-544
+Sources/CheppuSettings/SettingsWindow.swift
+  s_c781002de41942::t_74246b0a52fe86 227-229
+CONTEXT.md
+  s_c781002de41942::t_74d765d12c272e 116-117
+  s_c781002de41942::t_7111972acb65f9 118
+  s_c781002de41942::t_12886b469c4ade 100,112,115
+Tests/CheppuCoreTests/SettingsScreenTests.swift
+  s_c781002de41942::t_97b661936864a7 235-243,249
+  s_c781002de41942::t_4a180a328f8c68 246-248
+  s_c781002de41942::t_c4d827b2145f29 244-245
+Tests/CheppuCoreTests/Fakes/FakePorts.swift
+  s_c781002de41942::t_7b3c7bb061480f 80-96,99,110-118,302-312
+  s_c781002de41942::t_3ce829ad323dc5 313-314
+Tests/CheppuCoreTests/Fakes/PortJournal.swift
+  s_c781002de41942::t_7b3c7bb061480f 23-26
+Tests/CheppuCoreTests/MenuBarMenuTests.swift
+  s_c781002de41942::t_c8ac3ebd4a9599 110
+  s_c781002de41942::t_97b661936864a7 12,18,68,87-109
+Sources/CheppuCore/MenuBarMenu.swift
+  s_c781002de41942::t_7d3d01e79ec951 7-11,45-51,92-94,99-105,107,109
+Sources/CheppuCore/Settings/SettingsScreen.swift
+  s_c781002de41942::t_cd6e7129367d3f 48-59
+Tests/CheppuCoreTests/PillTests.swift
+  s_c781002de41942::t_e029eb8997a3ae 1-33,36-38
+  s_c781002de41942::t_4a180a328f8c68 34-35
+Tests/CheppuFeedbackTests/PillNoticeTests.swift
+  s_c781002de41942::t_c9aef4b6bb6c7b 1-47
+Tests/CheppuCoreTests/DictationCoreTests.swift
+  s_c781002de41942::t_25503aa4babc63 60,82-84,90
+  s_c781002de41942::t_bd52aad064c0c7 1070-1103,1107-1122,1126,1128-1129
+  s_c781002de41942::t_6792448e622a89 1123-1125,1127
+  s_c781002de41942::t_81c66cdf824a8c 1104-1106
+README.md
+  s_c781002de41942::t_3ee315670d66e8 70
+  s_c781002de41942::t_c7114222515215 65,69
+Sources/CheppuFeedback/PillView.swift
+  s_c781002de41942::t_0d943c74fa7403 22-26,46,48-51,53,55,95,152,156,158-161,163-168,170,174,178-182,184-191
+  s_c781002de41942::t_c9aef4b6bb6c7b 54,56-59
+Sources/Cheppu/MenuBarController.swift
+  s_c781002de41942::t_81c66cdf824a8c 278-288
+  s_c781002de41942::t_a6df052e318bd4 19,22-27,59-71,74,88-93,107-111,145
+  s_c781002de41942::t_50ed5522ef4f92 103
+  s_c781002de41942::t_63af5304de9395 172-179,181-186,190-194,199-200,208,215-231,249-256,258-260,271-277,289-292,313-315,324-325
+  s_c781002de41942::t_5f8b66479b8765 94-102
+Sources/CheppuCore/Dictation/Dictation.swift
+  s_c781002de41942::t_cdefae4b5e68d0 176-179,181-209
+  s_c781002de41942::t_99e044ae7b138d 161-163
+Sources/CheppuCore/Ports/Ports.swift
+  s_c781002de41942::t_7fd8588f113d1b 214-235
+Sources/CheppuCore/Dictation/DictationCore.swift
+  s_c781002de41942::t_cd6e7129367d3f 168-172
+  s_c781002de41942::t_cf666be591c3de 321-322
+  s_c781002de41942::t_11510ece2df6ac 29,52,64,146-150,173,180-187,189-190,196,199,201-202,319-320
+  s_c781002de41942::t_74d765d12c272e 188,191-195,197-198,200
+Sources/CheppuCore/Audio/AudioCaptureFailure.swift
+  s_c781002de41942::t_cd6e7129367d3f 23-40
+Sources/Cheppu/SayingWhatIsMissing.swift
+  s_c781002de41942::t_7b38d2d9413549 1-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "700ab1d4dbf773b11788867ac4755414511bcc69",
+  "prompts": {},
+  "sessions": {
+    "s_c781002de41942": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3064f1-6b53-44b1-8c5e-73e686cbd631",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
