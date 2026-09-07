@@ -11,9 +11,16 @@ import Testing
 struct HotkeyWatchTests {
     private static func watch(
         _ keyboard: FakeKeyboard,
-        accessibility: FakeAccessibilityAccess = FakeAccessibilityAccess(answering: [true])
+        accessibility: FakeAccessibilityAccess = FakeAccessibilityAccess(answering: [true]),
+        inputMonitoring: FakeInputMonitoringAccess = FakeInputMonitoringAccess(granted: false),
+        watchingFor hotkey: Hotkey = .byDefault
     ) -> HotkeyWatch {
-        HotkeyWatch(accessibility: accessibility, keyboard: keyboard)
+        HotkeyWatch(
+            accessibility: accessibility,
+            inputMonitoring: inputMonitoring,
+            keyboard: keyboard,
+            choice: ChosenHotkey(hotkey)
+        )
     }
 
     private static let hotkeyDown = KeyStroke.modifiersHeld([.rightOption])
@@ -71,6 +78,157 @@ struct HotkeyWatchTests {
         let watch = Self.watch(FakeKeyboard(refuses: true))
 
         await #expect(throws: FakeKeyboard.WillNotWatch.self) {
+            try await watch.observe { _ in }
+        }
+    }
+
+    // MARK: - Which key is watched for
+
+    @Test("The Hotkey watched for is the one the user chose, read as watching starts")
+    func theHotkeyWatchedForIsTheOneTheUserChose() async throws {
+        let keyboard = FakeKeyboard()
+        let watch = Self.watch(keyboard, watchingFor: .bareModifier(.leftControl))
+        let reported = ReportedGestures()
+
+        try await watch.observe(reported.report)
+        keyboard.strikes(.modifiersHeld([.leftControl]), Self.everythingUp)
+
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
+    }
+
+    @Test("Watching again is the whole of changing the Hotkey")
+    func watchingAgainIsTheWholeOfChangingTheHotkey() async throws {
+        // The user picks a new key in Settings, and the next press is theirs —
+        // no relaunch, and nothing between the window and the keyboard that has
+        // to be kept in step (ADR-0010).
+        let keyboard = FakeKeyboard()
+        let choice = ChosenHotkey()
+        let watch = HotkeyWatch(
+            accessibility: FakeAccessibilityAccess(answering: [true]),
+            inputMonitoring: FakeInputMonitoringAccess(),
+            keyboard: keyboard,
+            choice: choice
+        )
+        let reported = ReportedGestures()
+
+        try await watch.observe(reported.report)
+        await choice.change(to: .chord(Key(named: "D")!, with: [.leftControl]))
+        try await watch.observe(reported.report)
+
+        keyboard.strikes(.modifiersHeld([.leftControl]), .hotkeyKeyPressed, .hotkeyKeyReleased)
+
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
+    }
+
+    @Test("The keyboard is told which key to tell apart, and only where there is one")
+    func theKeyboardIsToldWhichKeyToTellApart() async throws {
+        // The one key the user chose is told apart from the ones they type, and
+        // on a bare-modifier Hotkey no key is told apart at all (ADR-0011).
+        let onAChord = FakeKeyboard()
+        try await Self.watch(
+            onAChord, watchingFor: .chord(Key(named: "D")!, with: [.leftControl])
+        ).observe { _ in }
+
+        let onTheDefault = FakeKeyboard()
+        try await Self.watch(onTheDefault).observe { _ in }
+
+        #expect(onAChord.keyToldApart == Key(named: "D"))
+        #expect(onTheDefault.keyToldApart == nil)
+    }
+
+    // MARK: - Input Monitoring
+
+    @Test("Input Monitoring is asked about only by a Hotkey that needs it")
+    func inputMonitoringIsAskedAboutOnlyByAHotkeyThatNeedsIt() async throws {
+        // Cheppu asks for no permission the chosen Hotkey does not actually
+        // need: on every key but the Globe one, a refusal has no bearing on
+        // whether the Hotkey works.
+        let keyboard = FakeKeyboard()
+        let refused = FakeInputMonitoringAccess(granted: false)
+
+        try await Self.watch(keyboard, inputMonitoring: refused).observe { _ in }
+
+        #expect(keyboard.isBeingWatched)
+        #expect(refused.timesAsked == 0)
+    }
+
+    @Test("Without Input Monitoring, the Globe key says so rather than doing nothing")
+    func withoutInputMonitoringTheGlobeKeySaysSo() async throws {
+        let keyboard = FakeKeyboard()
+        let watch = Self.watch(
+            keyboard,
+            inputMonitoring: FakeInputMonitoringAccess(granted: false),
+            watchingFor: .bareModifier(.function)
+        )
+
+        // A different failure from a missing Accessibility grant, because it is
+        // a different pane and a different sentence.
+        await #expect(throws: HotkeyFailure.inputMonitoringDenied) {
+            try await watch.observe { _ in }
+        }
+        #expect(!keyboard.isBeingWatched)
+    }
+
+    @Test("With Input Monitoring, the Globe key is watched like any other")
+    func withInputMonitoringTheGlobeKeyIsWatchedLikeAnyOther() async throws {
+        let keyboard = FakeKeyboard()
+        let watch = Self.watch(
+            keyboard,
+            inputMonitoring: FakeInputMonitoringAccess(granted: true),
+            watchingFor: .bareModifier(.function)
+        )
+        let reported = ReportedGestures()
+
+        try await watch.observe(reported.report)
+        keyboard.strikes(.modifiersHeld([.function]), Self.everythingUp)
+
+        #expect(await reported.nextGesture() == .pressed)
+        #expect(await reported.nextGesture() == .released)
+    }
+
+    @Test("A Hotkey that is refused takes the one it replaced down with it")
+    func aHotkeyThatIsRefusedTakesTheOneItReplacedDownWithIt() async throws {
+        // Somebody moves their Hotkey to the Globe key and does not grant Input
+        // Monitoring. What they must not be left with is the key they moved off
+        // still starting Dictations while Settings says they dictate on the
+        // Globe key.
+        let keyboard = FakeKeyboard()
+        let choice = ChosenHotkey()
+        let watch = HotkeyWatch(
+            accessibility: FakeAccessibilityAccess(answering: [true]),
+            inputMonitoring: FakeInputMonitoringAccess(granted: false),
+            keyboard: keyboard,
+            choice: choice
+        )
+        let reported = ReportedGestures()
+
+        try await watch.observe(reported.report)
+        await choice.change(to: .bareModifier(.function))
+
+        await #expect(throws: HotkeyFailure.inputMonitoringDenied) {
+            try await watch.observe(reported.report)
+        }
+
+        keyboard.strikes(Self.hotkeyDown, Self.everythingUp)
+        #expect(!keyboard.isBeingWatched)
+        #expect(await reported.gestures.isEmpty)
+    }
+
+    @Test("Accessibility is answered before Input Monitoring is ever considered")
+    func accessibilityIsAnsweredBeforeInputMonitoringIsEverConsidered() async throws {
+        // Without Accessibility no Hotkey works at all, so it is the thing to
+        // say. Telling a user to grant two permissions when the first one is
+        // the reason is two trips to System Settings instead of one.
+        let watch = Self.watch(
+            FakeKeyboard(),
+            accessibility: FakeAccessibilityAccess(answering: [false]),
+            inputMonitoring: FakeInputMonitoringAccess(granted: false),
+            watchingFor: .bareModifier(.function)
+        )
+
+        await #expect(throws: HotkeyFailure.accessibilityDenied) {
             try await watch.observe { _ in }
         }
     }

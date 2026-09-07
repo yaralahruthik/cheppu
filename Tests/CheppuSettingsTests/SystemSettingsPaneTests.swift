@@ -16,6 +16,7 @@ struct SystemSettingsPaneTests {
         // for both, would be Cheppu saying "it is in there somewhere".
         #expect(SystemSettingsPane.address(of: .microphone).hasSuffix("Privacy_Microphone"))
         #expect(SystemSettingsPane.address(of: .accessibility).hasSuffix("Privacy_Accessibility"))
+        #expect(SystemSettingsPane.address(of: .inputMonitoring).hasSuffix("Privacy_ListenEvent"))
 
         for permission in Permission.allCases {
             #expect(

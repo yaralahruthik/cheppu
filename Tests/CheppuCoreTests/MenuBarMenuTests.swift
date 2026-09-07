@@ -9,13 +9,13 @@ import Testing
 struct MenuBarMenuTests {
     @Test("Offers Quit")
     func offersQuit() {
-        #expect(MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items.contains(.quit))
+        #expect(MenuBarMenu(missingForTheHotkey: nil, areCuesOn: true).items.contains(.quit))
     }
 
     @Test("With the Hotkey working, the menu is History, the Cues, Settings and Quit")
     func withTheHotkeyWorkingTheMenuIsHistoryTheCuesSettingsAndQuit() {
         #expect(
-            MenuBarMenu(canSeeTheHotkey: true, areCuesOn: true).items
+            MenuBarMenu(missingForTheHotkey: nil, areCuesOn: true).items
                 == [.history, .cues(areOn: true), .settings, .quit]
         )
     }
@@ -65,10 +65,23 @@ struct MenuBarMenuTests {
         // the missing permission, and it comes first, because it is the reason
         // they opened the menu.
         #expect(
-            MenuBarMenu(canSeeTheHotkey: false, areCuesOn: true).items
-                == [.allowAccessibility, .history, .cues(areOn: true), .settings, .quit]
+            MenuBarMenu(missingForTheHotkey: .accessibility, areCuesOn: true).items
+                == [
+                    .allowPermission(.accessibility), .history, .cues(areOn: true), .settings,
+                    .quit,
+                ]
         )
-        #expect(MenuBarItem.allowAccessibility.title.contains("Accessibility"))
+        #expect(MenuBarItem.allowPermission(.accessibility).title.contains("Accessibility"))
+    }
+
+    @Test("The menu names the permission that is missing, not the usual one")
+    func theMenuNamesThePermissionThatIsMissing() {
+        // A user who chose the Globe key and was sent to the Accessibility pane
+        // would grant something they already had and come back to a Hotkey that
+        // still does nothing. Two permissions, two panes, two sentences.
+        #expect(
+            MenuBarItem.allowPermission(.inputMonitoring).title.contains("Input Monitoring")
+        )
     }
 
     @Test("An item that does something rather than switches something is never ticked")
@@ -76,7 +89,7 @@ struct MenuBarMenuTests {
         // A tick means "this is on", so an item that is an action rather than a
         // switch must not carry one.
         #expect(!MenuBarItem.quit.isTicked)
-        #expect(!MenuBarItem.allowAccessibility.isTicked)
+        #expect(!MenuBarItem.allowPermission(.accessibility).isTicked)
         #expect(!MenuBarItem.history.isTicked)
         #expect(!MenuBarItem.settings.isTicked)
     }
@@ -85,7 +98,7 @@ struct MenuBarMenuTests {
     func anItemWithNoShortcutClaimsNoKey() {
         // Said rather than spelled as an empty string, so an item cannot
         // quietly take a shortcut the user needs.
-        #expect(MenuBarItem.allowAccessibility.shortcutKey == nil)
+        #expect(MenuBarItem.allowPermission(.accessibility).shortcutKey == nil)
         #expect(MenuBarItem.history.shortcutKey == nil)
     }
 }

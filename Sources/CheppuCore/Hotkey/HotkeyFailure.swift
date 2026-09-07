@@ -14,4 +14,23 @@ public enum HotkeyFailure: Error, Equatable {
     /// needs it, so without it the Hotkey does nothing at all — which is
     /// exactly the silence the app has to speak into.
     case accessibilityDenied
+
+    /// The chosen Hotkey uses the Globe key, and Input Monitoring has not been
+    /// granted. macOS does not hand that key to apps the way it hands over
+    /// every other one, so without this the Hotkey does nothing — and the way
+    /// out of it is a different pane from the one Accessibility is on, which is
+    /// why it is a failure of its own rather than the same silence.
+    case inputMonitoringDenied
+
+    /// The permission standing in the way, which is what the app has to name
+    /// and which pane it has to open.
+    ///
+    /// Here rather than in the app, so that the sentence a user reads and the
+    /// pane a button opens are chosen from the same answer.
+    public var permission: Permission {
+        switch self {
+        case .accessibilityDenied: .accessibility
+        case .inputMonitoringDenied: .inputMonitoring
+        }
+    }
 }

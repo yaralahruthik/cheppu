@@ -17,6 +17,7 @@ final class FakeKeyboard: Keyboard, @unchecked Sendable {
     private let lock = NSLock()
     private var struck: (@Sendable (KeyStroke) -> Void)?
     private var watched = 0
+    private var toldApart: Key?
 
     /// Whether watching fails.
     let refuses: Bool
@@ -25,10 +26,11 @@ final class FakeKeyboard: Keyboard, @unchecked Sendable {
         self.refuses = refuses
     }
 
-    func watch(_ struck: @escaping @Sendable (KeyStroke) -> Void) throws {
+    func watch(tellingApart key: Key?, _ struck: @escaping @Sendable (KeyStroke) -> Void) throws {
         if refuses { throw WillNotWatch() }
         lock.withLock {
             self.struck = struck
+            self.toldApart = key
             watched += 1
         }
     }
@@ -46,6 +48,10 @@ final class FakeKeyboard: Keyboard, @unchecked Sendable {
 
     var isBeingWatched: Bool { lock.withLock { struck != nil } }
     var timesWatched: Int { lock.withLock { watched } }
+
+    /// The one key the keyboard was asked to tell apart from what the user
+    /// types, if it was asked to tell any apart at all.
+    var keyToldApart: Key? { lock.withLock { toldApart } }
 }
 
 /// The Accessibility switch, and a count of how often it was read.
@@ -70,6 +76,43 @@ final class FakeAccessibilityAccess: AccessibilityAccess, @unchecked Sendable {
     }
 
     var timesRead: Int { lock.withLock { readings } }
+}
+
+/// Input Monitoring, answered without a prompt and without IOKit.
+final class FakeInputMonitoringAccess: InputMonitoringAccess, @unchecked Sendable {
+    private let lock = NSLock()
+    private var asked = 0
+
+    let isGranted: Bool
+
+    init(granted isGranted: Bool = true) {
+        self.isGranted = isGranted
+    }
+
+    @discardableResult
+    func request() -> Bool {
+        lock.withLock { asked += 1 }
+        return isGranted
+    }
+
+    /// How often macOS was asked for it. A Hotkey that does not need the Globe
+    /// key must never make this anything but zero.
+    var timesAsked: Int { lock.withLock { asked } }
+}
+
+/// The Hotkey the user chose, and can choose again while the app is running.
+actor ChosenHotkey: HotkeyChoice {
+    private var chosen: Hotkey
+
+    init(_ chosen: Hotkey = .byDefault) {
+        self.chosen = chosen
+    }
+
+    func change(to hotkey: Hotkey) {
+        chosen = hotkey
+    }
+
+    func hotkey() async -> Hotkey { chosen }
 }
 
 /// Everything the Hotkey reported, in the order it reported it.

@@ -27,8 +27,16 @@ A press of the Hotkey that turns out to be typing — a key struck, or another m
 _Avoid_: false trigger, accidental activation, misfire
 
 **Hotkey**:
-The single user-configurable key or key chord that performs Activation. Defaults to the right Option key on its own.
+The single user-configurable key or key chord that performs Activation. Two shapes, and no third: a Bare Modifier or a Chord. Defaults to the right Option key on its own, which does nothing on its own in any app and needs no permission beyond the one watching the keyboard already needs. Changed from Settings, where it takes effect on the next press rather than the next launch — the watch reads it where it uses it (ADR-0010) — and where what choosing it costs is said at the moment it is chosen and never before: a Chord macOS already uses would be doubled rather than taken away, because Cheppu cannot swallow a keystroke (ADR-0006), and the Globe key needs Input Monitoring and a macOS setting or it does nothing at all. Only the one key the user chose is ever told apart from the ones they type (ADR-0011).
 _Avoid_: shortcut, keybinding
+
+**Bare Modifier**:
+A Hotkey that is one modifier key held on its own — the fastest thing there is to press, and the default. Reported only while nothing else is held with it, and taken back as a Spoiled Press the moment the user types with it, because a modifier held with a letter is somebody typing an accented character rather than reaching for Cheppu.
+_Avoid_: single key, modifier-only hotkey
+
+**Chord**:
+A Hotkey that is a key struck while exactly a set of modifiers is held — ⌃⌥D — and no more of them, so a chord with something extra held is somebody else's shortcut. Which side of the keyboard those modifiers are on does not matter, because it does not matter to macOS and is not what the user was shown. Never a Spoiled Press: a Chord was unambiguous the moment it was struck, so a key brushed during a Hold on one — a modifier included — is a key brushed during a Dictation, and what was said is kept. It ends when one of its own keys is let go of. The one key it is built on is the one key Cheppu tells apart from what the user types (ADR-0011).
+_Avoid_: key combination, shortcut, combo
 
 **Engine**:
 The on-device speech-to-text model that turns audio into a Raw Transcript. The MVP ships exactly one.
@@ -109,7 +117,7 @@ The list of recent Final Texts kept on the machine so a Dictation is never lost.
 _Avoid_: log, transcripts, recordings
 
 **Settings**:
-The one window everything the user can set is on: the three Cleanup switches, the Cues, launch at login, what macOS says about each permission, and the one action that empties History. The Hotkey belongs on it too, and is the one line of it not built yet. One screen, no tabs, and nothing to scroll for. Every switch takes effect where it is flicked rather than on the way out, because there is no way out — the window has no OK and no Cancel. What it moves is kept in the standard user defaults domain and read where it is used, never held (ADR-0010); there is no configuration file anybody is expected to find.
+The one window everything the user can set is on: the Hotkey, the three Cleanup switches, the Cues, launch at login, what macOS says about each permission the chosen Hotkey needs, and the one action that empties History. One screen, no tabs, and nothing to scroll for. It asks for no permission the Hotkey does not need: Input Monitoring is a row on it only while the Globe key is the Hotkey, and is asked for at the moment that key is chosen and at no other. Every switch takes effect where it is flicked rather than on the way out, because there is no way out — the window has no OK and no Cancel. What it moves is kept in the standard user defaults domain and read where it is used, never held (ADR-0010); there is no configuration file anybody is expected to find.
 _Avoid_: preferences, options, config, panel
 
 **Onboarding**:

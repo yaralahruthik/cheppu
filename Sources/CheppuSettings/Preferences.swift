@@ -18,7 +18,7 @@ import Foundation
 /// `UserDefaults` is documented as thread-safe and is reachable from wherever a
 /// Dictation happens to be running; Swift cannot see that, so the promise is
 /// made here rather than by wrapping it in an actor nothing would gain from.
-public struct Preferences: CueSwitch, CleanupSwitches, @unchecked Sendable {
+public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked Sendable {
     /// The keys, named for what they hold rather than for the row that shows
     /// them, so that renaming a control in the window cannot silently forget
     /// what the user chose.
@@ -28,6 +28,7 @@ public struct Preferences: CueSwitch, CleanupSwitches, @unchecked Sendable {
     /// Settings window still has them off after there is one.
     enum Key {
         static let cuesAreOn = "CuesAreOn"
+        static let hotkey = "Hotkey"
 
         static func cleanup(_ rule: CleanupRule) -> String {
             switch rule {
@@ -50,6 +51,28 @@ public struct Preferences: CueSwitch, CleanupSwitches, @unchecked Sendable {
     ///   running the tests cannot change what the user set.
     init(in defaults: UserDefaults) {
         self.defaults = defaults
+    }
+
+    /// Which key the user dictates with.
+    ///
+    /// Answered without suspending, unlike the port it satisfies, so that the
+    /// window can draw the row from it as it is being opened.
+    ///
+    /// A remembered Hotkey nothing can read — a domain edited by hand, or one
+    /// written by a version that spelled it differently — is the default rather
+    /// than nothing at all. The alternative is an app whose key does nothing
+    /// and that never says why.
+    public func hotkey() -> Hotkey {
+        defaults.string(forKey: Key.hotkey).flatMap(Hotkey.init(written:)) ?? .byDefault
+    }
+
+    /// Sets the key the user dictates with.
+    ///
+    /// Written down by name rather than by key code, so that a position that
+    /// means something else on the next keyboard cannot silently become a
+    /// different Hotkey.
+    public func choose(_ hotkey: Hotkey) {
+        defaults.set(hotkey.written, forKey: Key.hotkey)
     }
 
     /// Whether a Dictation makes a sound.

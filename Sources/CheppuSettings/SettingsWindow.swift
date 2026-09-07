@@ -21,7 +21,7 @@ import CheppuCore
 /// controls there are, what each says and which way each is set are decided in
 /// the core and in `Preferences`, and tested there.
 @MainActor
-public final class SettingsWindow: NSObject {
+public final class SettingsWindow: NSObject, NSWindowDelegate {
     private let preferences: Preferences
     private let launchAtLogin: LaunchAtLogin
     private let permissions: any Permissions
@@ -34,6 +34,15 @@ public final class SettingsWindow: NSObject {
     /// here, and a tick that disagreed with the sound would be worse than
     /// either.
     private let cuesMoved: () -> Void
+
+    /// Says the Hotkey has moved, so that whoever is watching the keyboard
+    /// watches for the new one. Cheppu is not told which key it is: it reads
+    /// that where it uses it, exactly as it reads every other switch
+    /// (ADR-0010).
+    private let hotkeyMoved: () -> Void
+
+    /// Listening for the key the user wants, while they are choosing one.
+    private var recorder: HotkeyRecorder?
 
     private var window: NSWindow?
     private let everything = NSStackView()
@@ -51,13 +60,15 @@ public final class SettingsWindow: NSObject {
         launchingAtLogin launchAtLogin: LaunchAtLogin = LaunchAtLogin(),
         asking permissions: any Permissions,
         clearingHistory clearHistory: @escaping () -> Void,
-        whenTheCuesMove cuesMoved: @escaping () -> Void
+        whenTheCuesMove cuesMoved: @escaping () -> Void,
+        whenTheHotkeyMoves hotkeyMoved: @escaping () -> Void
     ) {
         self.preferences = preferences
         self.launchAtLogin = launchAtLogin
         self.permissions = permissions
         self.clearHistory = clearHistory
         self.cuesMoved = cuesMoved
+        self.hotkeyMoved = hotkeyMoved
         super.init()
     }
 
@@ -89,6 +100,10 @@ public final class SettingsWindow: NSObject {
         )
         window.title = "Settings"
         window.isReleasedWhenClosed = false
+        // So that a window closed while it was listening for a Hotkey stops
+        // listening. Otherwise the keys pressed at Cheppu the next time it came
+        // to the front would still be going into a recording nobody can see.
+        window.delegate = self
         window.center()
 
         everything.orientation = .vertical
@@ -134,6 +149,13 @@ public final class SettingsWindow: NSObject {
         redrawIfShowing()
     }
 
+    public func windowWillClose(_ notification: Notification) {
+        // Stopped, and not redrawn: the window this would draw into is on its
+        // way out.
+        recorder?.stopListening()
+        recorder = nil
+    }
+
     /// Draws the screen the core describes.
     private func fill() {
         for view in everything.arrangedSubviews {
@@ -141,11 +163,14 @@ public final class SettingsWindow: NSObject {
             view.removeFromSuperview()
         }
 
+        let hotkey = preferences.hotkey()
         let screen = SettingsScreen(
+            hotkey: hotkey,
+            isChoosingAHotkey: recorder?.isListening == true,
             cleanup: preferences.rules(),
             areCuesOn: preferences.areCuesOn(),
             launchesAtLogin: launchAtLogin.isOn,
-            permissions: Permission.allCases.reduce(into: [:]) { statuses, permission in
+            permissions: Permission.neededBy(hotkey).reduce(into: [:]) { statuses, permission in
                 statuses[permission] = permissions.status(of: permission)
             }
         )
@@ -195,17 +220,9 @@ public final class SettingsWindow: NSObject {
             }
         }
 
-        return ReadingRow(control, saying: itsTitle, status: status(of: control)) { [weak self] in
+        return ReadingRow(control, saying: itsTitle, status: control.reading) { [weak self] in
             self?.act(on: control)
         }
-    }
-
-    /// What the row says about itself where it is a reading rather than a
-    /// switch. A permission says whether Cheppu has it; History says nothing
-    /// beyond what it already keeps.
-    private func status(of control: SettingsControl) -> String? {
-        guard case .permission(_, let status) = control else { return nil }
-        return status.name
     }
 
     /// Carries out what flicking a switch means, at the moment it is flicked.
@@ -230,7 +247,7 @@ public final class SettingsWindow: NSObject {
                 if took != on { sayLoginItemsRefused(asking: on) }
                 fill()
             }
-        case .permission, .history:
+        case .hotkey, .permission, .history:
             break
         }
     }
@@ -258,6 +275,8 @@ public final class SettingsWindow: NSObject {
     /// Carries out the button on a row that is not a switch.
     private func act(on control: SettingsControl) {
         switch control {
+        case .hotkey(_, let isBeingChosen):
+            if isBeingChosen { stopChoosingAHotkey() } else { chooseAHotkey() }
         case .permission(let permission, _):
             SystemSettingsPane.open(permission)
         case .history:
@@ -269,6 +288,80 @@ public final class SettingsWindow: NSObject {
         case .cleanupRule, .cues, .launchAtLogin:
             break
         }
+    }
+
+    // MARK: - Choosing a Hotkey
+
+    /// Starts listening for the key the user wants to dictate with.
+    ///
+    /// The row says so while it listens. A window that took the next keystroke
+    /// without saying it was about to would be one that stole a Command-Q.
+    private func chooseAHotkey() {
+        recorder = HotkeyRecorder { [weak self] chosen in
+            guard let self else { return }
+            recorder = nil
+            // On the next turn of the run loop rather than here: this is called
+            // from inside the handling of the keystroke that chose the Hotkey,
+            // and what follows it puts an alert on the screen.
+            Task {
+                if let chosen { take(chosen) } else { fill() }
+            }
+        }
+        recorder?.listen()
+        redrawAfterTheClick()
+    }
+
+    private func stopChoosingAHotkey() {
+        recorder?.stopListening()
+        recorder = nil
+        redrawAfterTheClick()
+    }
+
+    /// Draws the screen again on the next turn of the run loop.
+    ///
+    /// Not here: this is called from a row's own button, and redrawing takes
+    /// that button out from under the click that is still being delivered — the
+    /// same reason the login-item switch waits.
+    private func redrawAfterTheClick() {
+        Task { fill() }
+    }
+
+    /// Takes the Hotkey the user just pressed, once they have been told what it
+    /// costs them.
+    ///
+    /// The warning comes between the press and the setting rather than after
+    /// it: a user who is told what a key does once it is already theirs has
+    /// been informed rather than asked.
+    private func take(_ hotkey: Hotkey) {
+        guard hotkey.warnings.isEmpty || saysYesTo(hotkey) else {
+            fill()
+            return
+        }
+
+        preferences.choose(hotkey)
+        // Asked for here, at the moment the user's own choice makes it
+        // necessary, and never for a Hotkey that does not need it.
+        if hotkey.needsInputMonitoring { permissions.ask(for: .inputMonitoring) }
+        hotkeyMoved()
+        fill()
+    }
+
+    /// Says what the chosen key will cost, and asks whether they still want it.
+    ///
+    /// Everything they have to know in one alert rather than one after another,
+    /// because it is one decision: this key, or another one.
+    private func saysYesTo(_ hotkey: Hotkey) -> Bool {
+        let warnings = hotkey.warnings
+        let alert = NSAlert()
+        // The first, which is the Globe key's wherever there are two: what a
+        // key needs before it works at all outranks what it would double.
+        alert.messageText = warnings[0].title
+        alert.informativeText = warnings.map(\.explanation).joined(separator: "\n\n")
+        alert.addButton(withTitle: "Use \(hotkey.name)")
+        alert.addButton(withTitle: "Choose Another Key")
+
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 }
 

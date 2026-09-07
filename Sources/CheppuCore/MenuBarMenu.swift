@@ -4,9 +4,12 @@
 /// here knows about `NSMenu`, and nothing here performs the item's action —
 /// the shell maps an item onto the AppKit call that carries it out.
 public enum MenuBarItem: Equatable, Sendable {
-    /// Asks for Accessibility again, with the reason and the way to the right
-    /// System Settings pane. Offered only while Cheppu cannot see the Hotkey.
-    case allowAccessibility
+    /// Asks for the permission the Hotkey is missing, with the reason and the
+    /// way to the right System Settings pane. Offered only while Cheppu cannot
+    /// see the Hotkey, and it names the one permission that is in the way:
+    /// Accessibility for every Hotkey, and Input Monitoring for the Globe key,
+    /// which are two different panes and two different sentences.
+    case allowPermission(Permission)
 
     /// Opens History, so that a Dictation that went into the wrong window can
     /// be got back.
@@ -39,7 +42,7 @@ public enum MenuBarItem: Equatable, Sendable {
     /// The label the user reads in the menu.
     public var title: String {
         switch self {
-        case .allowAccessibility: "The Hotkey Needs Accessibility…"
+        case .allowPermission(let permission): "The Hotkey Needs \(permission.name)…"
         // The ellipsis is what says it opens a window rather than doing
         // something the moment it is let go of.
         case .history: "History…"
@@ -55,7 +58,7 @@ public enum MenuBarItem: Equatable, Sendable {
     /// one.
     public var shortcutKey: String? {
         switch self {
-        case .allowAccessibility: nil
+        case .allowPermission: nil
         case .history: nil
         case .cues: nil
         // The comma, as everywhere else on the machine. It reaches Cheppu only
@@ -72,7 +75,7 @@ public enum MenuBarItem: Equatable, Sendable {
     public var isTicked: Bool {
         switch self {
         case .cues(let areOn): areOn
-        case .allowAccessibility, .history, .settings, .quit: false
+        case .allowPermission, .history, .settings, .quit: false
         }
     }
 }
@@ -86,15 +89,15 @@ public struct MenuBarMenu: Equatable, Sendable {
     public let items: [MenuBarItem]
 
     /// - Parameters:
-    ///   - canSeeTheHotkey: whether Cheppu is watching for Activations. When it
-    ///     is not — Accessibility has not been granted — the menu says so and
-    ///     offers the way to fix it, because a user whose Hotkey does nothing
-    ///     has nowhere else to look. It comes first, because it is the reason
-    ///     they opened the menu.
+    ///   - missingForTheHotkey: the permission Cheppu is waiting on before it
+    ///     can watch for Activations, or nothing where it is already watching.
+    ///     Where there is one the menu says so and offers the way to fix it,
+    ///     because a user whose Hotkey does nothing has nowhere else to look.
+    ///     It comes first, because it is the reason they opened the menu.
     ///   - areCuesOn: whether a Dictation makes a sound.
-    public init(canSeeTheHotkey: Bool, areCuesOn: Bool) {
+    public init(missingForTheHotkey: Permission?, areCuesOn: Bool) {
         self.items =
-            (canSeeTheHotkey ? [] : [.allowAccessibility])
+            (missingForTheHotkey.map { [MenuBarItem.allowPermission($0)] } ?? [])
             + [.history, .cues(areOn: areCuesOn), .settings, .quit]
     }
 }

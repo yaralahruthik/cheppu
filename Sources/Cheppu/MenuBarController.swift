@@ -24,6 +24,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// is a Hotkey that does nothing.
     private var dictations: DictationCore?
 
+    /// The attempt to start watching, which goes on trying for as long as the
+    /// permission it needs is missing. Held so that choosing a different Hotkey
+    /// can replace it rather than race it.
+    private var watching: Task<Void, Never>?
+
     /// Everything Cheppu still has of what the user said, and the window they
     /// read it in. Held here rather than made when the menu item is picked, so
     /// that the Dictation writing to History and the window reading it are the
@@ -31,9 +36,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private let history = HistoryStore()
     private lazy var historyWindow = HistoryWindow(reading: history)
 
-    /// Whether the Hotkey is being watched. Everything the menu says about
-    /// Accessibility hangs off this.
-    private var canSeeTheHotkey = false
+    /// The permission standing between Cheppu and the Hotkey, or nothing where
+    /// it is being watched. Everything the menu says about a Hotkey that does
+    /// not work hangs off this, and which permission it is depends on the key
+    /// the user chose.
+    private var missingForTheHotkey: Permission?
 
     /// Everything the user has set, and the window they set it in.
     ///
@@ -49,7 +56,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         clearingHistory: { [weak self] in self?.emptyHistory() },
         // The Cue switch is in two places at once. Redrawing the menu is what
         // keeps the tick in it saying what the window just did.
-        whenTheCuesMove: { [weak self] in self?.showMenu() }
+        whenTheCuesMove: { [weak self] in self?.showMenu() },
+        // A Hotkey chosen in the window is watched for by the next press, with
+        // no relaunch: the watch reads the key where it uses it, so all that is
+        // needed is to watch again (ADR-0010).
+        whenTheHotkeyMoves: { [weak self] in self?.watchForTheHotkeyAgain() }
     )
 
     /// How long to leave between asking macOS again whether Cheppu may watch
@@ -86,7 +97,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             // turned off in Settings is off for the next thing the user says,
             // with nothing restarted and nothing told (ADR-0010).
             cleaningWith: preferences,
-            hotkey: HotkeyWatch(),
+            // The key it watches for is read from the same preferences the
+            // window writes, at the moment watching starts.
+            hotkey: HotkeyWatch(watchingFor: preferences),
             audio: MicrophoneCapture(),
             engine: engine,
             insertion: PasteInsertion(),
@@ -123,22 +136,30 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     ///
     /// The reason is given once, when Cheppu first finds it cannot watch; the
     /// menu goes on saying it for as long as it is true, because a user whose
-    /// Hotkey does nothing has nowhere else to look.
-    private func watchForTheHotkey(with dictations: DictationCore) {
-        Task { [weak self] in
-            var hasSaidWhy = false
+    /// Hotkey does nothing has nowhere else to look. Which reason it is depends
+    /// on the key they chose: every Hotkey needs Accessibility, and the Globe
+    /// key needs Input Monitoring on top of it.
+    private func watchForTheHotkey(with dictations: DictationCore, sayingWhy: Bool = true) {
+        watching?.cancel()
+        watching = Task { [weak self] in
+            var hasSaidWhy = !sayingWhy
             while let self, !Task.isCancelled {
                 do {
                     try await dictations.watchForActivations()
-                    canSeeTheHotkey = true
+                    missingForTheHotkey = nil
                     showMenu()
                     return
                 } catch {
-                    canSeeTheHotkey = false
+                    // A failure Cheppu has no name for is answered as the one
+                    // it does: without Accessibility no Hotkey works at all, so
+                    // it is the thing to say to somebody whose key is doing
+                    // nothing.
+                    let missing = (error as? HotkeyFailure)?.permission ?? .accessibility
+                    missingForTheHotkey = missing
                     showMenu()
                     if !hasSaidWhy {
                         hasSaidWhy = true
-                        AccessibilityRequest.ask()
+                        PermissionRequest.ask(for: missing, toWatch: preferences.hotkey())
                     }
                     try? await Task.sleep(for: Self.whileWaitingForAccessibility)
                 }
@@ -146,11 +167,27 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Watches again, for the Hotkey the user has just chosen.
+    ///
+    /// The whole of changing it: the watch reads the key where it uses it, so
+    /// there is nothing to hand over and nothing to keep in step (ADR-0010). It
+    /// replaces the attempt already under way, so a user who has just moved off
+    /// a key that needed a permission they never granted is not left behind a
+    /// loop still waiting for it.
+    ///
+    /// Nothing is said this time. The user is looking at the Settings window,
+    /// which has already told them what the key they picked costs and is
+    /// showing them the row for it; an alert on top of that is Cheppu saying it
+    /// twice.
+    private func watchForTheHotkeyAgain() {
+        guard let dictations else { return }
+        watchForTheHotkey(with: dictations, sayingWhy: false)
+    }
+
     private func showMenu() {
         statusItem?.menu = menu(
             for: MenuBarMenu(
-                canSeeTheHotkey: canSeeTheHotkey, areCuesOn: preferences.areCuesOn())
-        )
+                missingForTheHotkey: missingForTheHotkey, areCuesOn: preferences.areCuesOn()))
     }
 
     private func menu(for menuBarMenu: MenuBarMenu) -> NSMenu {
@@ -186,8 +223,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     @objc private func menuBarItemPicked(_ sender: NSMenuItem) {
         guard let item = sender.representedObject as? MenuBarItem else { return }
         switch item {
-        case .allowAccessibility:
-            AccessibilityRequest.ask()
+        case .allowPermission(let permission):
+            PermissionRequest.ask(for: permission, toWatch: preferences.hotkey())
         case .history:
             historyWindow.show()
         case .settings:
