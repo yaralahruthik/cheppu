@@ -33,7 +33,7 @@ Press Escape while listening to cancel: the audio is thrown away and nothing is 
 - A five-minute cap per dictation, so a forgotten toggle cannot record forever.
 - A recording pill with input level, plus start and stop sounds that can be turned off from the menu bar ([ADR-0007](./docs/adr/0007-the-cues-can-be-silenced-and-the-pill-cannot.md)).
 - Text-only History of the last 100 dictations, opened from the menu bar, copied one at a time and cleared in one action. It is one file under `~/Library/Application Support/Cheppu/`, readable by nobody but you ([ADR-0009](./docs/adr/0009-history-is-a-file-of-its-own-not-a-preference.md)). Every dictation is written to it before insertion is attempted, so a failure on the way out costs you nothing. Audio is discarded after transcription.
-- A settings window that fits on one screen: hotkey, cleanup toggles, sounds, launch at login, permissions status, and History.
+- A settings window that fits on one screen, opened from the menu bar: the cleanup toggles, sounds, launch at login, what macOS says about each permission, and History's one clear action. No tabs, no OK button — every switch takes effect where you flick it and is read again by the next dictation ([ADR-0010](./docs/adr/0010-settings-are-read-where-they-are-used.md)). The hotkey control joins it next.
 - Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command. An emulator Cheppu has never heard of is treated as one too ([ADR-0008](./docs/adr/0008-terminals-are-found-by-what-a-text-surface-looks-like.md)).
 - A first-run flow that requests permissions, downloads the model, and has you dictate one sentence before you use it anywhere else.
 - Signed and notarized builds via GitHub Releases and Homebrew, with in-app updates via Sparkle.
@@ -63,14 +63,16 @@ Cheppu asks for two permissions, each with a one-line reason at the moment it is
 - **Microphone**: to hear you, asked for by the first dictation that needs it.
 - **Accessibility**: to insert text into other apps and to see the hotkey while another app has focus. macOS has no prompt for this one — it is a switch in System Settings — so Cheppu says why in one line and opens the right pane for you. Until it is granted, the menu bar menu says the hotkey cannot work rather than leaving you with a key that does nothing.
 
+Settings says what macOS currently thinks of each of them, without you having to start a dictation to find out, and puts a button next to any it does not have that opens the right pane.
+
 Choosing the Fn/Globe key as your hotkey adds one more, Input Monitoring, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing". Cheppu explains both at the moment you choose that key, not before.
 
 ## Building
 
-Cheppu is a Swift package of eight targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `CheppuKeyboard` is the Hotkey: the one place Cheppu watches keys it was not sent and asks for Accessibility. `CheppuInsertion` is the pasteboard and the one keystroke Cheppu ever types. `CheppuFeedback` is the pill and the sounds: the one place Cheppu draws over another app's window or makes a noise. `CheppuHistory` is the History store and the window it is read in: the one place Cheppu writes what you said to the disk. `Cheppu` is the menu bar app that performs what the core decides.
+Cheppu is a Swift package of nine targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `CheppuKeyboard` is the Hotkey: the one place Cheppu watches keys it was not sent and asks for Accessibility. `CheppuInsertion` is the pasteboard and the one keystroke Cheppu ever types. `CheppuFeedback` is the pill and the sounds: the one place Cheppu draws over another app's window or makes a noise. `CheppuHistory` is the History store and the window it is read in: the one place Cheppu writes what you said to the disk. `CheppuSettings` is everything you can set and the one window you set it in: the only place Cheppu reads or writes a preference. `Cheppu` is the menu bar app that performs what the core decides.
 
 ```sh
-swift build                     # build the core, the Engine, the microphone, the keyboard, the Insertion, the Pill, History and the app
+swift build                     # build the core, the Engine, the microphone, the keyboard, the Insertion, the Pill, History, Settings and the app
 swift test                      # run the suite
 ./Scripts/make-app.sh           # assemble dist/Cheppu.app
 ./Scripts/check-core-is-headless.sh
@@ -82,11 +84,12 @@ swift test                      # run the suite
 ./Scripts/check-the-pill-never-takes-focus.sh
 ./Scripts/check-cleanup-is-a-pure-function.sh
 ./Scripts/check-history-holds-text-only.sh
+./Scripts/check-settings-are-one-domain.sh
 ```
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
 
-The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard, types a key, puts a window on your screen or makes a sound, and the only files it writes are in a temporary directory of its own — your own History is never opened, read or cleared by it, so running it never asks your terminal for Microphone or Accessibility access, never disturbs what you had copied, and is silent. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
+The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard, types a key, puts a window on your screen or makes a sound, and the only files it writes are in a temporary directory of its own — your own History is never opened, read or cleared by it, and the only preferences it writes are in a domain of its own, so nothing you set is changed by it — so running it never asks your terminal for Microphone or Accessibility access, never disturbs what you had copied, and is silent. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
 
 Transcribing for real needs the 480 MB Engine, so those tests are off by default and off in CI:
 

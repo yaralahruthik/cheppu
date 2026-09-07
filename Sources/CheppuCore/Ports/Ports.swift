@@ -169,6 +169,30 @@ public protocol HistoryPort: Sendable {
     func append(_ entry: HistoryEntry) async throws
 }
 
+/// Whether the Cues may be heard.
+///
+/// Read rather than held, and read at each Cue rather than at launch, so that
+/// turning them off silences the Dictation under way rather than the next one
+/// after a restart.
+///
+/// A port rather than something the Pill owns, because the switch belongs to
+/// the user: it is one line of the Settings window and one item of the menu
+/// bar, and both of them move the same thing (ADR-0010).
+public protocol CueSwitch: Sendable {
+    func areCuesOn() async -> Bool
+}
+
+/// Which Cleanup rules the user has on.
+///
+/// Read rather than held, exactly as the Cue switch is, and read at the moment
+/// the words are about to be cleaned rather than when the app launched. That is
+/// what makes a switch flicked in Settings the switch the very next Dictation
+/// goes through, with nothing to keep in step and nothing to restart
+/// (ADR-0010).
+public protocol CleanupSwitches: Sendable {
+    func rules() async -> CleanupRules
+}
+
 /// The Pill and the Cues — the two senses through which the user knows the
 /// state without looking at Cheppu.
 public protocol FeedbackPort: Sendable {

@@ -1,6 +1,5 @@
 import AppKit
 import CheppuCore
-import Foundation
 
 /// Something that can make a short sound.
 ///
@@ -11,41 +10,6 @@ protocol Speaker: Sendable {
     /// Plays this Cue's sound, and returns without waiting for it to finish. A
     /// Cue marks a moment; nothing about a Dictation waits on one.
     func play(_ cue: Cue) async
-}
-
-/// Whether the Cues may be heard.
-///
-/// Read rather than held, and read at each Cue rather than at launch, so that
-/// turning them off silences the Dictation under way rather than the next one
-/// after a restart.
-public protocol CueSwitch: Sendable {
-    func areCuesOn() async -> Bool
-}
-
-/// The Cue switch, as macOS keeps it: a preference under Cheppu's own domain.
-///
-/// On unless the user has said otherwise: someone who has not been to Settings
-/// has not asked for a Dictation they cannot hear. The Settings window (#15) is
-/// what moves it; this is where it is read from and written to until then.
-public struct SystemCueSwitch: CueSwitch {
-    /// The one key. Named for what it holds rather than for the switch that
-    /// shows it, so that renaming the control in Settings cannot silently
-    /// forget what the user chose.
-    static let key = "CuesAreOn"
-
-    public init() {}
-
-    /// Answered without suspending, unlike the port it satisfies, so that the
-    /// menu can be built from it as it is opened rather than a moment
-    /// afterwards.
-    public func areCuesOn() -> Bool {
-        UserDefaults.standard.object(forKey: Self.key) as? Bool ?? true
-    }
-
-    /// Turns the Cues on or off, for a user dictating in a meeting.
-    public func turnCues(on: Bool) {
-        UserDefaults.standard.set(on, forKey: Self.key)
-    }
 }
 
 /// The Cues: the half of the feedback a user with their eyes on their work

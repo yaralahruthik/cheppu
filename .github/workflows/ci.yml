@@ -48,6 +48,9 @@ jobs:
       - name: History holds text only
         run: ./Scripts/check-history-holds-text-only.sh
 
+      - name: Settings are one domain
+        run: ./Scripts/check-settings-are-one-domain.sh
+
       # No Engine downloaded, no model, no microphone and nothing granted on
       # this runner: the suite has to be green all the same, which is the whole
       # point of the ports.

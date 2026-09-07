@@ -119,6 +119,22 @@ final class SystemMicrophone: Microphone, @unchecked Sendable {
     }
 }
 
+/// Whether Cheppu may listen, as macOS has already answered it.
+///
+/// Public, and separate from asking, because Settings has to be able to say
+/// whether the permission is there without a prompt appearing and without a
+/// Dictation being started to find out (`docs/product-experience.md` §9). The
+/// asking stays where it was: inside the Dictation that needs it.
+///
+/// Never asked and refused are one answer here. They are a difference to macOS
+/// and not to the user: either way Cheppu cannot hear them, and either way the
+/// way out is the same pane.
+public enum MicrophonePermission {
+    public static var isGranted: Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
+}
+
 /// Microphone access as macOS answers it.
 struct SystemMicrophoneAccess: MicrophoneAccess {
     /// Prompts the first time, with the one sentence in `NSMicrophoneUsageDescription`

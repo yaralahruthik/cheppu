@@ -131,6 +131,21 @@ public struct Cleanup: Sendable {
     }
 }
 
+/// One of the three Cleanup rules, named.
+///
+/// `CleanupRules` holds the three as fields, because that is what lets Cleanup
+/// read a switch without asking which row of a window it came from. This is the
+/// other direction, and it is what the Settings window shows: one row per rule,
+/// taken from the rules themselves rather than written out by hand, so that a
+/// fourth rule cannot arrive with no switch in front of it
+/// (`docs/product-experience.md` §8). What each row says is the screen's, and
+/// is written where the rest of the screen's words are.
+public enum CleanupRule: CaseIterable, Equatable, Sendable {
+    case removesFillerWords
+    case capitalisesSentences
+    case breaksParagraphs
+}
+
 /// Which of the three Cleanup rules are on.
 ///
 /// Each is a switch of its own, because a user who wants their Filler Words
@@ -155,6 +170,15 @@ public struct CleanupRules: Equatable, Sendable {
         self.removesFillerWords = removesFillerWords
         self.capitalisesSentences = capitalisesSentences
         self.breaksParagraphs = breaksParagraphs
+    }
+
+    /// Whether one named rule is on.
+    public subscript(rule: CleanupRule) -> Bool {
+        switch rule {
+        case .removesFillerWords: removesFillerWords
+        case .capitalisesSentences: capitalisesSentences
+        case .breaksParagraphs: breaksParagraphs
+        }
     }
 }
 

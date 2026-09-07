@@ -368,4 +368,20 @@ struct CleanupTests {
         // moved, not a letter changed.
         #expect(Cleanup(.off).finalText(from: heard).text == heard.text)
     }
+
+    @Test("Every rule reads back through the name it is set by")
+    func everyRuleReadsBackThroughTheNameItIsSetBy() {
+        // The name is how the Settings window asks which way a switch is set. A
+        // name that pointed at the wrong field would be a row saying one thing
+        // and showing another, and nothing the user could see would give it
+        // away.
+        for rule in CleanupRule.allCases {
+            #expect(CleanupRules.all[rule])
+            #expect(!CleanupRules.off[rule])
+        }
+
+        #expect(!Self.onlyCapitals[.removesFillerWords])
+        #expect(Self.onlyCapitals[.capitalisesSentences])
+        #expect(!Self.onlyCapitals[.breaksParagraphs])
+    }
 }
