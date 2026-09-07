@@ -28,6 +28,7 @@ public actor DictationCore {
     private let feedback: any FeedbackPort
     private let permissions: any PermissionPort
     private let clock: any ClockPort
+    private let diagnostics: any DiagnosticsPort
 
     /// When the Hotkey went down, as the Clock read it.
     ///
@@ -40,6 +41,9 @@ public actor DictationCore {
     ///   on their way to the Target App. A port rather than a value, so that a
     ///   switch the user moves in Settings is read by the next Dictation
     ///   without anything being told about it (ADR-0010).
+    /// - Parameter diagnostics: where what happened is written down, so that a
+    ///   problem can be sent to somebody who can fix it without sending what
+    ///   was said. Told rather than asked: nothing here waits on it.
     public init(
         cleaningWith cleanup: any CleanupSwitches,
         hotkey: any HotkeyPort,
@@ -50,7 +54,8 @@ public actor DictationCore {
         history: any HistoryPort,
         feedback: any FeedbackPort,
         permissions: any PermissionPort,
-        clock: any ClockPort
+        clock: any ClockPort,
+        diagnostics: any DiagnosticsPort
     ) {
         self.machine = DictationMachine()
         self.cleanup = cleanup
@@ -63,6 +68,7 @@ public actor DictationCore {
         self.feedback = feedback
         self.permissions = permissions
         self.clock = clock
+        self.diagnostics = diagnostics
     }
 
     /// Starts watching for Activations, so that the Hotkey runs a Dictation
@@ -72,9 +78,19 @@ public actor DictationCore {
     /// `HotkeyFailure.accessibilityDenied` — which the app says out loud rather
     /// than leaving the user with a key that does nothing.
     public func watchForActivations() async throws {
-        try await hotkey.observe { [weak self] gesture in
-            await self?.activated(by: gesture)
+        do {
+            try await hotkey.observe { [weak self] gesture in
+                await self?.activated(by: gesture)
+            }
+        } catch {
+            // Written down because nothing else will say it. Every other
+            // failure ends a Dictation somebody was watching; this one is a key
+            // that does nothing, which from outside the app is indistinguishable
+            // from a key nobody pressed.
+            diagnostics.record(.theHotkeyCouldNotBeWatched(FailureName(of: error)))
+            throw error
         }
+        diagnostics.record(.watchingForTheHotkey)
     }
 
     /// Takes a gesture from whoever is watching the keyboard, and times it.
@@ -157,7 +173,11 @@ public actor DictationCore {
 
         do {
             while !queued.isEmpty {
-                for effect in machine.receive(queued.removeFirst()) {
+                let event = queued.removeFirst()
+                let before = machine.state
+                let effects = machine.receive(event)
+                writeDown(whatMoved: before, by: event)
+                for effect in effects {
                     if let reported = try await perform(effect) {
                         queued.append(reported)
                     }
@@ -165,19 +185,43 @@ public actor DictationCore {
             }
         } catch {
             queued.removeAll()
+            let (ended, worthWritingDown) = whatEnded(by: error)
+            diagnostics.record(worthWritingDown)
+            let before = machine.state
             // Nothing on the way back to Idle can fail — the Pill has to come
             // down, or say which permission is missing and stay up — but a
             // second failure while unwinding the first has nowhere useful to go,
             // and losing the app to it would be worse than losing the
             // Dictation.
-            for effect in machine.receive(whatEnded(by: error)) {
+            let effects = machine.receive(ended)
+            writeDown(whatMoved: before, by: ended)
+            for effect in effects {
                 _ = try? await perform(effect)
             }
             throw error
         }
     }
 
-    /// What a failure means to the Dictation it ended.
+    /// Writes down that a Dictation moved, where it did.
+    ///
+    /// Only where the state actually changed. An Input Level arrives many times
+    /// a second and a stray Hotkey press between two Dictations arrives whenever
+    /// the user's hand does; neither is a thing that happened to a Dictation,
+    /// and a log with a line for each of them would bury the four that matter
+    /// and put a disk write on the stop-to-insert path
+    /// (`docs/product-experience.md` §7).
+    ///
+    /// The note is handed over rather than awaited, so what this costs the
+    /// Dictation is the comparison above it and nothing else.
+    private func writeDown(whatMoved before: DictationState, by event: DictationEvent) {
+        let after = machine.state
+        guard before != after else { return }
+        diagnostics.record(
+            .dictationMoved(from: before, to: after, by: DiagnosticNote.WhatHappened(event)))
+    }
+
+    /// What a failure means to the Dictation it ended, and what the log is told
+    /// about it.
     ///
     /// A refusal the user can undo is named, because saying which permission it
     /// was and putting them in front of the switch is the difference between a
@@ -193,11 +237,17 @@ public actor DictationCore {
     /// refused by: the keyboard is asked for once, by `watchForActivations()`,
     /// which is not on this path and where a refusal is the app's to say rather
     /// than a Dictation's — there is no Dictation to put a Pill up for.
-    private func whatEnded(by error: Error) -> DictationEvent {
+    private func whatEnded(by error: Error) -> (DictationEvent, DiagnosticNote) {
         guard let permission = (error as? AudioCaptureFailure)?.permission else {
-            return .dictationFailed
+            // Named by what it is rather than by what it says about itself,
+            // which is the whole of `FailureName`.
+            return (.dictationFailed, .somethingFailed(FailureName(of: error)))
         }
-        return .permissionMissing(permission)
+        // The same split the log makes as the one the user is shown, decided
+        // once: somebody reading a week of these is looking for exactly this,
+        // and a Dictation and a log that answered it separately could come to
+        // disagree about which failure it was.
+        return (.permissionMissing(permission), .permissionMissing(permission))
     }
 
     /// Takes the Cap from the Clock, five minutes into a Dictation.

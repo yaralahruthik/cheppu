@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 @testable import CheppuCore
 
@@ -131,10 +132,27 @@ struct FakeAudioCapture: AudioCapturePort {
 /// An Engine that returns a canned Raw Transcript, so the core suite never
 /// loads a model.
 struct FakeEngine: EnginePort {
+    /// What this Engine does when a Dictation asks it to transcribe.
+    enum Outcome: Sendable {
+        /// It hears what it was told it would hear.
+        case hears
+
+        /// There is no Engine on the machine to transcribe with — which
+        /// reaches the core as an error it has no name for, exactly as an
+        /// Engine that would not load does.
+        case findsNoEngineOnTheMachine
+    }
+
+    /// A refusal from outside the core's vocabulary: the core has never heard
+    /// of it, and what the Diagnostics Log can say about it is its name.
+    struct NoEngineOnTheMachine: Error {}
+
     let journal: PortJournal
     let transcript: RawTranscript
+    var outcome: Outcome = .hears
 
     func transcribe(_ audio: CapturedAudio) async throws -> RawTranscript {
+        guard case .hears = outcome else { throw NoEngineOnTheMachine() }
         await journal.record(.transcribed(audio))
         return transcript
     }
@@ -185,6 +203,23 @@ enum ARawTranscript {
             WordTiming(word: "the", start: .milliseconds(3_700), end: .milliseconds(3_900)),
             WordTiming(word: "next", start: .milliseconds(4_000), end: .milliseconds(4_200)),
             WordTiming(word: "one", start: .milliseconds(4_300), end: .milliseconds(4_500)),
+        ]
+    )
+
+    /// A Dictation of the kind somebody would think twice about sending to a
+    /// stranger, made of words that appear nowhere else in Cheppu.
+    ///
+    /// What the Diagnostics Log is searched for. Common words would find
+    /// themselves in "listening" and "the Hotkey went down" and prove nothing;
+    /// these appear in the log only if the log kept what was said.
+    static let somethingWorthNotSharing = RawTranscript(
+        text: "Priya, the mortgage on Kalyani Nagar is fixed until Thursday.",
+        words: [
+            WordTiming(word: "Priya,", start: .zero, end: .milliseconds(400)),
+            WordTiming(word: "mortgage", start: .milliseconds(500), end: .milliseconds(900)),
+            WordTiming(word: "Kalyani", start: .milliseconds(1_000), end: .milliseconds(1_400)),
+            WordTiming(word: "Nagar", start: .milliseconds(1_500), end: .milliseconds(1_900)),
+            WordTiming(word: "Thursday.", start: .milliseconds(2_000), end: .milliseconds(2_400)),
         ]
     )
 }
@@ -374,5 +409,27 @@ extension Duration {
     /// This Duration in the seconds `Date` counts in.
     var asTimeInterval: TimeInterval {
         TimeInterval(components.seconds) + TimeInterval(components.attoseconds) * 1e-18
+    }
+}
+
+/// The Diagnostics Log, kept in memory instead of on the disk.
+///
+/// A real one stamps each note and writes it to a file; this one keeps them in
+/// the order they arrived, which is the whole of what the core decided.
+///
+/// It is not an actor, because the port it stands in for is not one: a note is
+/// handed over rather than awaited, so that nothing on the stop-to-insert path
+/// waits for a log. A lock is what that costs here, and it is the same shape
+/// the real one is built on.
+final class FakeDiagnostics: DiagnosticsPort {
+    private let written = Mutex<[DiagnosticNote]>([])
+
+    func record(_ note: DiagnosticNote) {
+        written.withLock { $0.append(note) }
+    }
+
+    /// Everything written down, in the order it happened.
+    var notes: [DiagnosticNote] {
+        written.withLock { $0 }
     }
 }

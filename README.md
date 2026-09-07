@@ -38,7 +38,7 @@ Press Escape while listening to cancel: the audio is thrown away and nothing is 
 - Terminal awareness: paragraph breaks are never pasted into a terminal, where a newline can run a command. An emulator Cheppu has never heard of is treated as one too ([ADR-0008](./docs/adr/0008-terminals-are-found-by-what-a-text-surface-looks-like.md)).
 - A first-run flow that requests permissions, downloads the model, and has you dictate one sentence before you use it anywhere else.
 - Signed and notarized builds via GitHub Releases and Homebrew, with in-app updates via Sparkle.
-- No telemetry and no crash reporter. A local log file, never containing audio or text, is the whole diagnostic story.
+- No telemetry, no crash reporter and no analytics. A local log file is the whole diagnostic story: `~/Library/Application Support/Cheppu/Diagnostics.log`, beside History, holding the states each dictation moved through and how long each of them took, and never a word of what you said — nothing a line of it is made of can carry one. It rotates into a second file and keeps no more than the two, so it cannot grow without end, and you can read it before you decide to send it to anybody ([ADR-0012](./docs/adr/0012-the-log-is-told-rather-than-asked.md)).
 
 ## What deliberately does not ship in the MVP
 
