@@ -263,3 +263,29 @@ public protocol ClockPort: Sendable {
     /// follows it never happens.
     func stopWaiting() async
 }
+
+/// The Diagnostics Log: what Cheppu did, kept on the machine so that a problem
+/// can be sent to somebody who can fix it without sending what was said.
+///
+/// The whole of Cheppu's diagnostic story. There is no telemetry, no crash
+/// reporter and no analytics behind this port — one file, written by the
+/// machine it is about, that the user reads before they decide to share it.
+///
+/// It is the one port that is told rather than asked. Every other one is a
+/// request the core waits on; a note is handed over and let go of, because
+/// notes are written on the path between somebody finishing a sentence and the
+/// words appearing, and nothing on that path may wait for a disk
+/// (`docs/product-experience.md` §7). Whoever implements it stamps the note as
+/// it arrives and writes it later, so the log's timings are the moments things
+/// happened rather than the moments the disk got round to them.
+///
+/// Neither half of that is what a logger usually is, so both are on record
+/// (ADR-0012).
+///
+/// Nothing it does can fail as far as the core is concerned. A log that could
+/// not be written must never be what costs the user a Dictation: it is the
+/// least important thing Cheppu does and it is on the path of the most
+/// important one.
+public protocol DiagnosticsPort: Sendable {
+    func record(_ note: DiagnosticNote)
+}

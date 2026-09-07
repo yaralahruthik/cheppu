@@ -9,7 +9,12 @@ import Foundation
 /// latency budget for a Dictation is a breath, so the cost is paid on the first
 /// transcription of a run and never again.
 public actor ParakeetEngine: EnginePort, EngineDownloadPort {
-    public enum Failure: Error, Equatable {
+    /// Named in full in the Diagnostics Log rather than by the type it is
+    /// (`FailureSafeToName`): the cases carry nothing, so there is nothing in
+    /// one of them that could be something the user said, and "the Engine is
+    /// not on the machine" is worth far more to somebody reading a log than the
+    /// name of the enumeration it came out of.
+    public enum Failure: Error, Equatable, FailureSafeToName {
         /// Asked to transcribe before the Engine was on the machine. The
         /// Onboarding ticket is what makes sure this never reaches a user; until
         /// then it is the honest answer rather than a silent 480 MB download in

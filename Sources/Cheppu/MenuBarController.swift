@@ -1,6 +1,7 @@
 import AppKit
 import CheppuAudio
 import CheppuCore
+import CheppuDiagnostics
 import CheppuEngine
 import CheppuFeedback
 import CheppuHistory
@@ -47,6 +48,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// not work hangs off this, and which permission it is depends on the key
     /// the user chose.
     private var missingForTheHotkey: Permission?
+
+    /// What Cheppu did, written down so that a problem can be sent to somebody
+    /// who can fix it without sending what was said. One log for the whole app,
+    /// held here for the same reason the History store is: everything writing
+    /// to it has to be writing to the same file.
+    private let diagnostics = DiagnosticsLog()
 
     /// Everything the user has set, and the window they set it in.
     ///
@@ -143,7 +150,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             history: history,
             feedback: PillAndCues(when: preferences),
             permissions: sayingWhatIsMissing,
-            clock: SystemClock()
+            clock: SystemClock(),
+            diagnostics: diagnostics
         )
         self.dictations = dictations
 

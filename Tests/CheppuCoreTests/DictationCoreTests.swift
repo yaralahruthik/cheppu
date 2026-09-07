@@ -49,6 +49,7 @@ struct DictationCoreTests {
         let focus: FakeFocus
         let clipboard: FakeClipboard
         let cleanup: FakeCleanupSwitches
+        let diagnostics: FakeDiagnostics
         let core: DictationCore
 
         init(
@@ -62,6 +63,7 @@ struct DictationCoreTests {
             hadCopied: String? = nil,
             historyRefuses: Bool = false,
             isAccessibilityGranted: Bool = true,
+            engine: FakeEngine.Outcome = .hears,
             cleaningWith rules: CleanupRules = .all
         ) {
             let journal = PortJournal()
@@ -70,7 +72,9 @@ struct DictationCoreTests {
             let focus = FakeFocus(on: app)
             let clipboard = FakeClipboard(journal: journal, holding: hadCopied)
             let cleanup = FakeCleanupSwitches(rules)
+            let diagnostics = FakeDiagnostics()
             self.cleanup = cleanup
+            self.diagnostics = diagnostics
             self.journal = journal
             self.clock = clock
             self.hotkey = hotkey
@@ -82,13 +86,14 @@ struct DictationCoreTests {
                 audio: FakeAudioCapture(
                     journal: journal, captured: captures, outcome: microphone,
                     hearsLevels: hearsLevels),
-                engine: FakeEngine(journal: journal, transcript: hears),
+                engine: FakeEngine(journal: journal, transcript: hears, outcome: engine),
                 insertion: FakeInsertion(journal: journal, focus: focus, outcome: insertion),
                 clipboard: clipboard,
                 history: FakeHistory(journal: journal, refuses: historyRefuses),
                 feedback: FakeFeedback(journal: journal),
                 permissions: FakePermissions(journal: journal),
-                clock: clock
+                clock: clock,
+                diagnostics: diagnostics
             )
         }
 
@@ -1126,5 +1131,130 @@ struct DictationCoreTests {
         let named = await scenario.journal.calls.filter { $0 == .askedFor(.microphone) }
         #expect(said.count == 2)
         #expect(named.count == 2)
+    }
+
+    // MARK: - The Diagnostics Log
+
+    @Test("A Dictation is written down as the states it moved through")
+    func aDictationIsWrittenDownAsTheStatesItMovedThrough() async throws {
+        let scenario = Scenario()
+
+        try await scenario.toggleADictationWithTheHotkey()
+
+        // The whole story of a Dictation in four lines, and the whole of its
+        // timings too: what is written next to each of these is when it
+        // happened, so how long the user spoke, how long the Engine took and
+        // how long the words took to land are the gaps between them.
+        #expect(
+            scenario.diagnostics.notes == [
+                .watchingForTheHotkey,
+                .dictationMoved(from: .idle, to: .listening, by: .theHotkeyWentDown),
+                .dictationMoved(from: .listening, to: .transcribing, by: .theHotkeyWentDown),
+                .dictationMoved(
+                    from: .transcribing, to: .inserting, by: .theRawTranscriptArrived),
+                .dictationMoved(from: .inserting, to: .idle, by: .theInsertionLanded),
+            ]
+        )
+    }
+
+    @Test("Nothing the user said is anywhere in the log")
+    func nothingTheUserSaidIsAnywhereInTheLog() async throws {
+        let said = ARawTranscript.somethingWorthNotSharing
+        let scenario = Scenario(hears: said)
+
+        try await scenario.toggleADictationWithTheHotkey()
+
+        // Dictate known text and search the log for it, which is the acceptance
+        // this whole vocabulary exists to pass. Not one word of what the Engine
+        // heard, and not one word of the Final Text that Cleanup made of it, is
+        // anywhere in what was written down — because nothing a note is made of
+        // can carry a word at all.
+        let written = String(describing: scenario.diagnostics.notes)
+        for word in said.words.map({ $0.word.trimmingCharacters(in: .punctuationCharacters) }) {
+            #expect(!written.localizedCaseInsensitiveContains(word))
+        }
+    }
+
+    @Test("The log is a line per thing that happened, not a line per event")
+    func theLogIsALinePerThingThatHappened() async throws {
+        let scenario = Scenario(
+            hearsLevels: (0...20).map { InputLevel(Double($0) / 20) })
+
+        try await scenario.toggleADictationWithTheHotkey()
+
+        // A Dictation reports its Input Level many times a second and not one
+        // of them is a thing that happened to it. A log that wrote a line per
+        // event would bury the four that matter under a hundred that do not —
+        // and would put a disk write on the stop-to-insert path
+        // (`docs/product-experience.md` §7).
+        #expect(scenario.diagnostics.notes.count == 5)
+    }
+
+    @Test("A permission that was taken away is named in the log")
+    func aPermissionThatWasTakenAwayIsNamedInTheLog() async throws {
+        let scenario = Scenario(microphone: .findsTheMicrophoneTakenAway)
+        try await scenario.core.watchForActivations()
+
+        await scenario.hotkey.press()
+
+        // The one failure with a name worth writing down, and the one somebody
+        // reading a week of these is looking for: every Dictation ending here
+        // is a permission that was taken away, not an app that is broken.
+        #expect(
+            scenario.diagnostics.notes.contains(.permissionMissing(.microphone)))
+        #expect(
+            scenario.diagnostics.notes.contains(
+                .dictationMoved(from: .listening, to: .idle, by: .aPermissionWasMissing)))
+    }
+
+    @Test("A failure the core has no name for is written down by its own name")
+    func aFailureTheCoreHasNoNameForIsWrittenDownByItsOwnName() async throws {
+        let scenario = Scenario(engine: .findsNoEngineOnTheMachine)
+        try await scenario.core.watchForActivations()
+
+        await scenario.tapTheHotkey()
+        await scenario.tapTheHotkey()
+
+        // Named rather than described: what a stranger's error prints is a
+        // stranger's to decide, and a type name is written into the binary when
+        // Cheppu is built.
+        let named = scenario.diagnostics.notes.compactMap { note -> String? in
+            guard case .somethingFailed(let name) = note else { return nil }
+            return name.description
+        }
+        #expect(named == ["CheppuCoreTests.FakeEngine.NoEngineOnTheMachine"])
+    }
+
+    @Test("An Insertion that did not land is written down as the way it ended")
+    func anInsertionThatDidNotLandIsWrittenDownAsTheWayItEnded() async throws {
+        let scenario = Scenario(insertion: .findsTheFocusMoved)
+
+        try await scenario.toggleADictationWithTheHotkey()
+
+        // The Clipboard Fallback, read off the log: the Dictation reached
+        // Inserting and left it without the words landing. That is what tells
+        // somebody diagnosing a report of "my words did not appear" that they
+        // are on the clipboard rather than lost.
+        #expect(
+            scenario.diagnostics.notes.last
+                == .dictationMoved(from: .inserting, to: .idle, by: .theInsertionDidNotLand))
+    }
+
+    @Test("A keyboard Cheppu may not watch is written down, because nothing else says so")
+    func aKeyboardCheppuMayNotWatchIsWrittenDown() async throws {
+        let scenario = Scenario(isAccessibilityGranted: false)
+
+        await #expect(throws: HotkeyFailure.self) {
+            try await scenario.core.watchForActivations()
+        }
+
+        // The one failure that is not a Dictation's: there is no Dictation to
+        // fail, so from outside the app a Hotkey nobody may watch and a Hotkey
+        // nobody pressed look exactly the same.
+        #expect(
+            scenario.diagnostics.notes == [
+                .theHotkeyCouldNotBeWatched(FailureName(of: HotkeyFailure.accessibilityDenied))
+            ]
+        )
     }
 }

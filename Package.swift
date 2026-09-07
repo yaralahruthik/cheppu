@@ -70,6 +70,19 @@ let package = Package(
             dependencies: ["CheppuCore"]
         ),
 
+        // The Diagnostics Log: the one file Cheppu writes about itself, and
+        // the whole of its diagnostic story — no telemetry, no crash reporter,
+        // no analytics. A target of its own rather than part of the app so that
+        // the promises the log makes — nothing of what was said anywhere in it,
+        // a bound it cannot grow past, and a write that never waits on the path
+        // between a user finishing a sentence and the words appearing — are
+        // testable against a real file in a temporary directory, with the
+        // user's own log never written to.
+        .target(
+            name: "CheppuDiagnostics",
+            dependencies: ["CheppuCore"]
+        ),
+
         // The Pill and the Cues: the one place Cheppu draws over another app's
         // window and the one place it makes a sound. A target of its own rather
         // than part of the app so that where the Pill goes so as not to cover
@@ -97,7 +110,7 @@ let package = Package(
             name: "Cheppu",
             dependencies: [
                 "CheppuCore", "CheppuEngine", "CheppuAudio", "CheppuKeyboard", "CheppuInsertion",
-                "CheppuFeedback", "CheppuHistory", "CheppuSettings",
+                "CheppuFeedback", "CheppuHistory", "CheppuSettings", "CheppuDiagnostics",
             ]
         ),
 
@@ -139,6 +152,11 @@ let package = Package(
         .testTarget(
             name: "CheppuSettingsTests",
             dependencies: ["CheppuSettings"]
+        ),
+
+        .testTarget(
+            name: "CheppuDiagnosticsTests",
+            dependencies: ["CheppuDiagnostics"]
         ),
     ],
     swiftLanguageModes: [.v6]

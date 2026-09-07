@@ -17,8 +17,8 @@ import CheppuEngine
 /// watching the Hotkey and goes on asking for Accessibility all the same: an
 /// app that quietly did nothing at all would be the one outcome
 /// `docs/product-experience.md` §4 rules out, and each Dictation instead fails
-/// where the Engine would have been. Saying so where the user can read it waits
-/// for #18's log.
+/// where the Engine would have been, and says so in the Diagnostics Log by the
+/// name of the failure it threw.
 struct EngineWithNowhereToLive: EnginePort {
     func transcribe(_ audio: CapturedAudio) async throws -> RawTranscript {
         throw ParakeetEngine.Failure.engineNotDownloaded
