@@ -1,0 +1,64 @@
+CONTEXT.md
+  s_51af46f0bfb95e::t_07ec434fd9e034 132
+Sources/Cheppu/MenuBarController.swift
+  s_51af46f0bfb95e::t_d8485df3477257 18-21,74,254-260
+  s_51af46f0bfb95e::t_42671a6893d9e2 14-15,61-73,75-76,98-102,181,185-203,205-211,339-340
+Sources/Cheppu/OnboardingWindow.swift
+  s_51af46f0bfb95e::t_f944c64ef6c6ff 28,69,90-99,213-215,257-261,285-288,423-432,434-437,451-480
+  s_51af46f0bfb95e::t_2f1c1167cc1ab0 43-46
+  s_51af46f0bfb95e::t_509643fd928ace 224-225,228
+  s_51af46f0bfb95e::t_2080e87a4ca60e 1-27,29-42,47-68,70-89,100-212,216-223,226-227,229-256,262-269,275,277-284,289-290,301,304,309-377,379-422,433,438-450,481-482
+  s_51af46f0bfb95e::t_70253f49739943 270-274
+  s_51af46f0bfb95e::t_d8485df3477257 276,291-300,302-303,305-308,378
+Sources/CheppuAudio/Microphone.swift
+  s_51af46f0bfb95e::t_7912fa88bb99b2 139-153
+  s_51af46f0bfb95e::t_037df3f32bf11b 126-130
+Sources/CheppuSettings/Preferences.swift
+  s_51af46f0bfb95e::t_e19cf170007079 32,79-101
+  s_51af46f0bfb95e::t_e78f1864508ce3 102
+Sources/Cheppu/UnbuiltPorts.swift
+  s_51af46f0bfb95e::t_f9a8aa1ee03f56 22-27,31-36
+  s_51af46f0bfb95e::t_bbfa9eee6b1915 37-38
+README.md
+  s_51af46f0bfb95e::t_81f511abeb1716 39,75
+  s_51af46f0bfb95e::t_037df3f32bf11b 64
+Sources/CheppuCore/Settings/SettingsScreen.swift
+  s_51af46f0bfb95e::t_037df3f32bf11b 28-30
+Tests/CheppuCoreTests/EngineDownloadProgressTests.swift
+  s_51af46f0bfb95e::t_dddbd7d9dfbba1 34-61
+Tests/CheppuSettingsTests/PreferencesTests.swift
+  s_51af46f0bfb95e::t_e19cf170007079 157-188
+Sources/CheppuEngine/ParakeetEngine.swift
+  s_51af46f0bfb95e::t_037df3f32bf11b 18-23
+docs/adr/0013-the-first-launch-is-read-rather-than-counted.md
+  s_51af46f0bfb95e::t_07ec434fd9e034 30-32
+  s_51af46f0bfb95e::t_5a57389d17e978 1-29,33
+Sources/CheppuCore/MenuBarMenu.swift
+  s_51af46f0bfb95e::t_42671a6893d9e2 93-95
+Sources/CheppuCore/Engine/EngineDownloadProgress.swift
+  s_51af46f0bfb95e::t_af5543c949324a 20-43
+Tests/CheppuCoreTests/OnboardingTests.swift
+  s_51af46f0bfb95e::t_2ca9eab10923f2 190-200,205-209
+  s_51af46f0bfb95e::t_57f1014cf21a9d 1-182,184-189,210-216,238-303
+  s_51af46f0bfb95e::t_7f551b55c37488 183,201-204,217-237
+Sources/CheppuCore/Onboarding/Onboarding.swift
+  s_51af46f0bfb95e::t_5b30cdac57a274 1-13,21-98,101-118,122-186,193-195,198-229,231-240,242,259,264-291
+  s_51af46f0bfb95e::t_d8485df3477257 99-100,119-121,196-197,241,243-258,260-263
+  s_51af46f0bfb95e::t_2ca9eab10923f2 14-20,187-192,230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "81377174b8ddcf286a580d9e426b84b6fd4203b0",
+  "prompts": {},
+  "sessions": {
+    "s_51af46f0bfb95e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d70cf02-97d7-4600-98fb-aa880c355f31",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
