@@ -94,6 +94,14 @@ swift test                      # run the suite
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
 
+macOS files that grant under the *signature* as well as the bundle, and an ad-hoc signature is pinned to the exact bytes it was made from — so an ad-hoc build has to be granted Accessibility again after every rebuild, and until it is, the switch in System Settings reads as on while the hotkey never arrives. Signing every build with the same identity makes them the same app to the system and the grant outlives the rebuild. Any code signing identity does; a self-signed one made in Keychain Access (Certificate Assistant → Create a Certificate…, name it what you like, type "Code Signing") costs a minute and never expires into anything worse than the ad-hoc case:
+
+```sh
+CHEPPU_SIGN_IDENTITY="Cheppu Local" ./Scripts/make-app.sh
+```
+
+`make-app.sh` signs ad-hoc without it, which runs fine — it is only the grant that does not survive. Signing for distribution, with a Developer ID and notarization, is a separate thing and not what this is.
+
 The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard, types a key, puts a window on your screen or makes a sound, and the only files it writes are in a temporary directory of its own — your own History is never opened, read or cleared by it, and the only preferences it writes are in a domain of its own, so nothing you set is changed by it — so running it never asks your terminal for Microphone or Accessibility access, never disturbs what you had copied, and is silent. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
 
 Transcribing for real needs the 480 MB Engine, so those tests are off by default and off in CI:
