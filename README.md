@@ -1,4 +1,9 @@
-# Cheppu
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/brand/cheppu-lockup-dark.svg">
+    <img alt="Cheppu — చెప్పు" src="./docs/brand/cheppu-lockup.svg" width="260">
+  </picture>
+</h1>
 
 **Cheppu** (Telugu: "tell me") is a local-first voice dictation app for macOS.
 
@@ -201,7 +206,9 @@ Cheppu's mark is a text caret whose stem is a level meter: two rails holding the
 
 It is drawn on a 24-unit grid, and these numbers are the whole of it: rails 14 × 2.4 with a 1.2 radius, at y 2 and y 19.6; three bars 2.4 wide with the same radius, centred on x 8.5, 12 and 15.5, of heights 8, 13 and 8, each centred on y 12. Clear space is four units on every side of the 14 × 20 bounding box, and nothing enters it, the wordmark included. Below 16 pt the gaps between the bars close, so nothing smaller than that ships, and the mark is never outlined — it is solid so that it can be found at a glance in a menu bar that is mostly thin outline glyphs.
 
-Ink is `#211F1C`, terracotta `#C2551F`, ground `#FAF7F2`. Terracotta marks the middle bar on the app icon and in material like this file, and never in the menu bar, where the mark is a template and macOS picks the colour — for the appearance you are in, and for the highlight drawn while the menu is open. The wordmark is *Cheppu* set in Space Grotesk Medium.
+Ink is `#211F1C`, terracotta `#C2551F`, ground `#FAF7F2`. Terracotta marks the middle bar on the app icon and in material like this file, and never in the menu bar, where the mark is a template and macOS picks the colour — for the appearance you are in, and for the highlight drawn while the menu is open. The wordmark is *Cheppu* set in Space Grotesk Medium, and the name in the script it comes from is చెప్పు set in Noto Sans Telugu Medium.
+
+The lockup at the top of this file is the mark, the wordmark, and the name in Telugu. The mark stands the height of the text beside it — the wordmark's cap line down to the Telugu baseline — and the wordmark begins six units out, clear space and a half. Both runs of text are outlined rather than set, because an SVG rendered as an image fetches no fonts: set as text, the wordmark would arrive in whatever the reader had to hand, and చెప్పు in nothing at all. That leaves the words with no source but the file they are in, so [`Scripts/draw-the-lockup.py`](./Scripts/draw-the-lockup.py) states the shaping and the spacing instead, and [`cheppu-lockup.svg`](./docs/brand/cheppu-lockup.svg) and [`cheppu-lockup-dark.svg`](./docs/brand/cheppu-lockup-dark.svg) are drawn from it rather than edited by hand.
 
 The mark lives in [`docs/brand/`](./docs/brand/) as three SVGs: [`cheppu-mark.svg`](./docs/brand/cheppu-mark.svg) for light backgrounds, [`cheppu-mark-dark.svg`](./docs/brand/cheppu-mark-dark.svg) for dark ones, and [`cheppu-mark-template.svg`](./docs/brand/cheppu-mark-template.svg), which paints in `currentColor` and is the same shape the menu bar glyph is drawn from. That glyph is drawn in code rather than shipped as an asset: [`MenuBarIcon.swift`](./Sources/Cheppu/MenuBarIcon.swift) states these numbers once more, fits the mark's 14 × 20 of ink into the 18 points AppKit lays a status item out at, and leaves half a point of air above and below so the rails do not sit on the edge. The shape is said twice, so it changes twice or not at all.
 
