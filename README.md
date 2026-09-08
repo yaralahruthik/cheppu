@@ -188,6 +188,23 @@ Every fixture is scored twice, because "wrong" is two questions. **What the Engi
 
 The ceilings in [`AccuracyCeiling.swift`](./Tests/CheppuAccuracyTests/AccuracyCeiling.swift) are each the first measured rate plus two points, not a target somebody picked, so the test catches Cheppu getting worse rather than asserting a standard it has never met. It runs in CI as a job of its own on an Apple Silicon runner — the only hardware Cheppu supports, and the only hardware a CoreML ceiling means anything on — so that a model load never sits between a push and the answer to "does it still build". The checks that the corpus is a corpus (every fixture has both its halves, and all three kinds of speech are covered) need no Engine and run in the fast suite.
 
+## The mark
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/brand/cheppu-mark-dark.svg">
+    <img alt="The Cheppu mark: a text caret whose stem is a level meter" src="./docs/brand/cheppu-mark.svg" width="104">
+  </picture>
+</p>
+
+Cheppu's mark is a text caret whose stem is a level meter: two rails holding the place where the words will land, and three bars saying that something is being heard between them. It draws the promise rather than the machinery — the words appear where your cursor is — and the bars carry the Pill's own rhythm, tallest in the middle, so what you install and what you watch while you dictate are visibly one thing.
+
+It is drawn on a 24-unit grid, and these numbers are the whole of it: rails 14 × 2.4 with a 1.2 radius, at y 2 and y 19.6; three bars 2.4 wide with the same radius, centred on x 8.5, 12 and 15.5, of heights 8, 13 and 8, each centred on y 12. Clear space is four units on every side of the 14 × 20 bounding box, and nothing enters it, the wordmark included. Below 16 pt the gaps between the bars close, so nothing smaller than that ships, and the mark is never outlined — it is solid so that it can be found at a glance in a menu bar that is mostly thin outline glyphs.
+
+Ink is `#211F1C`, terracotta `#C2551F`, ground `#FAF7F2`. Terracotta marks the middle bar on the app icon and in material like this file, and never in the menu bar, where the mark is a template and macOS picks the colour — for the appearance you are in, and for the highlight drawn while the menu is open. The wordmark is *Cheppu* set in Space Grotesk Medium.
+
+The mark lives in [`docs/brand/`](./docs/brand/) as three SVGs: [`cheppu-mark.svg`](./docs/brand/cheppu-mark.svg) for light backgrounds, [`cheppu-mark-dark.svg`](./docs/brand/cheppu-mark-dark.svg) for dark ones, and [`cheppu-mark-template.svg`](./docs/brand/cheppu-mark-template.svg), which paints in `currentColor` and is the same shape the menu bar glyph is drawn from. That glyph is drawn in code rather than shipped as an asset: [`MenuBarIcon.swift`](./Sources/Cheppu/MenuBarIcon.swift) states these numbers once more, fits the mark's 14 × 20 of ink into the 18 points AppKit lays a status item out at, and leaves half a point of air above and below so the rails do not sit on the edge. The shape is said twice, so it changes twice or not at all.
+
 ## Status
 
 Pre-alpha. The product is being designed in the open before code is written. See [`CONTEXT.md`](./CONTEXT.md) for the project vocabulary, [`docs/adr/`](./docs/adr/) for the decisions and their reasons, and [`docs/product-experience.md`](./docs/product-experience.md) for what we think a good dictation app has to get right.
