@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+  pull_request:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -12,6 +13,11 @@ jobs:
     name: Build the app and run the core suite
     # Apple Silicon, matching the only hardware Cheppu supports.
     runs-on: macos-15
+
+    # A push to the branch already built it, and a pull request is that same
+    # branch. Running on both events would build the same commit twice, and a
+    # macOS runner is billed at ten times a Linux one.
+    if: github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +86,12 @@ jobs:
     # CoreML is a different graph on a different chip, and a ceiling measured
     # on one says nothing about the other.
     runs-on: macos-15
+
+    # A 480 MB download and a model load, on a runner billed at ten times a
+    # Linux one. That is worth paying for the commits that reach main and for
+    # the pull requests asking to, and not for every push to a branch still
+    # being written.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
 
     # The Engine is 480 MB over somebody else's network. A fetch that has stalled
     # should say so within the hour rather than sitting on a runner for six.
