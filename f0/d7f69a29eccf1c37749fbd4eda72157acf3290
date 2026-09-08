@@ -1,0 +1,23 @@
+README.md
+  s_7a723860475871::t_648ceb0b53221c 123-124
+CONTEXT.md
+  s_7a723860475871::t_b37ed8ce1a32b8 134-155
+Package.swift
+  s_7a723860475871::t_45aceab9c221d9 172-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f0d7f69a29eccf1c37749fbd4eda72157acf3290",
+  "prompts": {},
+  "sessions": {
+    "s_7a723860475871": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f220003-a7ad-46b5-a32b-b66806ae1f5e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
