@@ -1,0 +1,29 @@
+docs/brand/cheppu-mark-template.svg
+  s_b29368f938b17f::t_93f965a6fc3fd4 1-2,8
+  s_b29368f938b17f::t_de6648b58846a9 3-7
+docs/brand/cheppu-mark.svg
+  s_b29368f938b17f::t_93f965a6fc3fd4 1-8
+README.md
+  s_b29368f938b17f::t_32d6e8edbeecfb 191-205,207
+  s_b29368f938b17f::t_49367cfde8c4b2 206
+Sources/Cheppu/MenuBarIcon.swift
+  s_b29368f938b17f::t_8a2cd261220ad6 3,5-15,26-37,40-41,45,53-64,67-73,75-87
+docs/brand/cheppu-mark-dark.svg
+  s_b29368f938b17f::t_93f965a6fc3fd4 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "202ec1723e116f435d5ed5025fb22f45180cd2ae",
+  "prompts": {},
+  "sessions": {
+    "s_b29368f938b17f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4898dde0-dc40-460f-93e6-0b33089c7680",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
