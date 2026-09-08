@@ -1,0 +1,19 @@
+.github/workflows/ci.yml
+  s_95e4e69df81de9::t_26f8b9e82f852c 5,17-21,90-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "7ba8c1c2fc14cdbcc20fcae33970217f85c9cdd2",
+  "prompts": {},
+  "sessions": {
+    "s_95e4e69df81de9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e390cdca-7c2b-47b7-b6d9-04cb7b7f29d8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
