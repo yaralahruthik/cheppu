@@ -169,6 +169,15 @@ let package = Package(
         .testTarget(
             name: "CheppuAccuracyTests",
             dependencies: ["CheppuCore", "CheppuEngine"],
+
+            // The files the fixtures were converted from, kept because the same
+            // sentence cannot be said twice: if the Engine ever hears in at
+            // something other than 16 kHz, a fixture downsampled to it is not
+            // recoverable and the author's voice would have to be recorded
+            // again. Excluded rather than made a resource — nothing opens them,
+            // and bundling them would put two megabytes into the test binary
+            // that no test reads.
+            exclude: ["Originals"],
             resources: [.copy("Fixtures")]
         ),
     ],

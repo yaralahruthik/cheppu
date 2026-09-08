@@ -131,3 +131,25 @@ _Avoid_: preferences, options, config, panel
 **Onboarding**:
 The first-run sequence: permissions, Engine download, and one successful Dictation in a field the app controls.
 _Avoid_: setup wizard, welcome flow
+
+### Accuracy
+
+**Accuracy Fixture**:
+One piece of the author speaking, and the words they actually said: a 16 kHz mono `.wav` and a `.txt` sharing a name. The author's own voice and vocabulary rather than a public benchmark set, because what is being measured is whether Cheppu hears the person using it, and a good score on somebody else's read-aloud corpus would say nothing about that. Committed at exactly what the Engine hears in, so that what is measured is the Engine and not a resampler on the way to it. Made in an app of the user's own and converted, never by a script that opens the microphone: a script that did would ask macOS for Microphone access on behalf of a terminal and grant it to everything ever run there. The file it was converted from is kept beside it and read by nothing, because the same sentence cannot be said twice.
+_Avoid_: sample, clip, test case, recording
+
+**Accuracy Corpus**:
+Every Accuracy Fixture, taken together. It covers technical terms, proper nouns and long-form dictation, and covers them by name rather than by claim — the three are files the suite insists on finding, so the coverage is a fact about the repository rather than a sentence in a comment. Measured as one number rather than as an average of rates, so that ten seconds of "testing one two three" cannot weigh as much as two minutes of dictation. A corpus that quietly shrinks is a Ceiling that quietly stops meaning anything, so a fixture that has lost half of itself is an error rather than a fixture skipped.
+_Avoid_: dataset, test set, benchmark
+
+**Reference Transcript**:
+What was said in an Accuracy Fixture, written down by the person who said it. What was said rather than what they meant to say: a word stumbled over is in the audio and belongs in the reference too, because the Engine has to hear the user on an ordinary day and not only on a rehearsed one. Punctuation and case are in it for the reader's sake and count for nothing — the measurement erases both, since they are Cleanup's business and are tested there.
+_Avoid_: ground truth, expected output, label, gold standard
+
+**Word Error Rate**:
+How wrong the Engine was over the Accuracy Corpus: the words it heard as some other word, the words it missed and the words it invented, over the words that were actually said. The denominator is what was said rather than what was heard, so an Engine that invents a hundred words is not rewarded with a bigger one. Measured two ways, because "wrong" is two questions. *As spoken* forgives the ways two faithful transcripts of the same sounds get written differently — a number in digits, a compound split in two, a contraction, an American spelling of a word the author spells the British way — and is what published speech-recognition rates are measured under. *As written* forgives none of them, because they are still words the user goes back and fixes. Neither is the true one, which is why there is a Ceiling for each: the Engine no longer hearing a word is not the same event as the Engine rendering it differently, and one number would report the two identically.
+_Avoid_: accuracy, WER, score, quality
+
+**Ceiling**:
+How wrong the Engine is allowed to be before CI goes red. Never invented up front: each is the first rate measured on the Accuracy Corpus plus a small absolute margin, recorded beside the day, the chip and the Engine version it was measured with, so that the test catches Cheppu getting worse rather than asserting a standard it has never met. Raising one is allowed and is meant to be uncomfortable, and lowering one after a genuine improvement is the other half of the same discipline — a Ceiling left far above an Engine that has got better is a test that has stopped measuring anything. Not the Cap, which is a limit on how long one Dictation may run.
+_Avoid_: threshold, budget, target, baseline
