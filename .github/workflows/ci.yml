@@ -70,3 +70,47 @@ jobs:
       # first Dictation fails with no prompt the user could have said yes to.
       - name: The bundle says why it wants the Microphone
         run: test -n "$(plutil -extract NSMicrophoneUsageDescription raw dist/Cheppu.app/Contents/Info.plist)"
+
+  accuracy:
+    name: Word error rate on the committed fixtures
+    # A job of its own rather than a step in the one above, so that a 480 MB
+    # download and a model load never sit between a push and the answer to
+    # "does it still build". Apple Silicon, which is the only hardware Cheppu
+    # supports and the only hardware the ceiling was measured on: Parakeet on
+    # CoreML is a different graph on a different chip, and a ceiling measured
+    # on one says nothing about the other.
+    runs-on: macos-15
+
+    # The Engine is 480 MB over somebody else's network. A fetch that has stalled
+    # should say so within the hour rather than sitting on a runner for six.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Engine is the same 480 MB on every run, and the Engine Download is
+      # the only network path Cheppu has. Caching it keeps this job about
+      # accuracy rather than about bandwidth.
+      - name: Restore the Engine
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Application Support/Cheppu/Engine
+          key: engine-${{ runner.os }}-${{ hashFiles('Sources/CheppuEngine/EngineFiles.swift', 'Package.resolved') }}
+
+      # Loads the real Parakeet, transcribes the committed audio of the
+      # author's own voice, and fails if the measured rate has drifted past the
+      # ceiling in Tests/CheppuAccuracyTests/AccuracyCeiling.swift.
+      - name: Word error rate
+        env:
+          CHEPPU_ACCURACY: "1"
+        run: |
+          set -o pipefail
+          swift test --filter CheppuAccuracyTests 2>&1 | tee measured.log
+
+          # The measurement is off unless CHEPPU_ACCURACY is set, and a suite
+          # that skipped is a suite that passed. Without this line, losing the
+          # env block above would turn this job permanently green while
+          # measuring nothing — which is the exact failure the whole ticket
+          # exists to prevent, wearing a tick.
+          grep -q "what the Engine heard, over" measured.log \
+            || { echo "::error::the accuracy job ran but measured nothing"; exit 1; }

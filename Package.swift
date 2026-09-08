@@ -158,6 +158,19 @@ let package = Package(
             name: "CheppuDiagnosticsTests",
             dependencies: ["CheppuDiagnostics"]
         ),
+
+        // Accuracy: the real Engine, over audio of the author's own voice,
+        // measured against what was actually said. A test target of its own
+        // rather than more of `CheppuEngineTests` because it is the one part of
+        // the suite a fake would defeat entirely — and because loading 480 MB of
+        // Parakeet must never be something `swift test` does on the way past.
+        // The measurement runs only under `CHEPPU_ACCURACY`; the arithmetic
+        // underneath it runs always, and costs microseconds.
+        .testTarget(
+            name: "CheppuAccuracyTests",
+            dependencies: ["CheppuCore", "CheppuEngine"],
+            resources: [.copy("Fixtures")]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

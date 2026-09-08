@@ -1,0 +1,7 @@
+Cheppu is a local first dictation app for the Mac. You press a key, you speak, and the words appear where your cursor already is. Nothing you say ever leaves the machine, and there is no account, no server, and no network path except the one time it fetches the model.
+
+While you are talking, a small pill floats above whatever you are working in. It shows that the app is listening and how loud the microphone is hearing you, and it moves out of the way of the field you are dictating into. When you stop, the audio goes to the engine, the engine hands back the words, and the words are typed into whichever application had keyboard focus at the moment you stopped.
+
+If the insertion cannot land, the text is left on the clipboard and the pill says so in words, so the thing you just said is never lost. History keeps the hundred most recent dictations on the disk, holding the text and a timestamp and nothing else. No audio, no raw transcript, and no record of which application the words went into.
+
+The whole design is one path, made as good as one path can be.

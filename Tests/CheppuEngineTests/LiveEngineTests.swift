@@ -8,15 +8,17 @@ import Testing
 /// The Engine doing its actual job, with the real Parakeet on the machine.
 ///
 /// Off by default, and off in CI, because it needs 480 MB fetched over the
-/// network — the one thing the rest of the suite exists to avoid. It is what
-/// answers the two questions the other tests structurally cannot: are the words
-/// right, and does a minute of speech come back in well under a second.
+/// network — the one thing the rest of the suite exists to avoid. It answers
+/// the question the other tests structurally cannot: does a minute of speech
+/// come back in well under a second. Whether the words are *right* is
+/// `CheppuAccuracyTests`, which measures a word error rate against audio of the
+/// author over there rather than guessing at it here.
 ///
 ///     CHEPPU_LIVE_ENGINE=1 swift test --filter LiveEngineTests
 ///
-/// The speech is synthesised with `say` rather than committed, so the repository
-/// carries no audio. Word-error-rate measurement against real recordings is its
-/// own ticket.
+/// The speech is synthesised with `say` rather than committed, which is all a
+/// timing needs: a stopwatch does not care whose voice it is. The audio in the
+/// repository is the accuracy corpus, and it is the author's own.
 @Suite(
     "Live Engine",
     .enabled(if: ProcessInfo.processInfo.environment["CHEPPU_LIVE_ENGINE"] != nil),
