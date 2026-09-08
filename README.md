@@ -88,6 +88,8 @@ swift test                      # run the suite
 ./Scripts/check-cleanup-is-a-pure-function.sh
 ./Scripts/check-history-holds-text-only.sh
 ./Scripts/check-settings-are-one-domain.sh
+./Scripts/check-the-log-says-nothing-of-what-was-said.sh
+./Scripts/add-an-accuracy-fixture.sh <recording> <name>   # add to the accuracy corpus
 ```
 
 Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
@@ -101,6 +103,28 @@ CHEPPU_LIVE_ENGINE=1 swift test --filter LiveEngineTests
 ```
 
 They fetch the Engine into `~/Library/Application Support/Cheppu/Engine`, transcribe speech synthesised with `say`, and check that a minute of it comes back in well under a second. See [ADR-0005](./docs/adr/0005-cheppu-fetches-the-engine-itself.md) for why Cheppu fetches the Engine itself rather than letting its dependency do it.
+
+### Accuracy
+
+Everything above runs with nothing downloaded and nothing plugged in, which is what keeps it fast — and none of it can answer the only question that decides whether Cheppu is usable: are the words right. `CheppuAccuracyTests` can. It loads the real Parakeet, transcribes committed audio of the author's own voice, and measures the word error rate against what was actually said:
+
+```sh
+CHEPPU_ACCURACY=1 swift test --filter CheppuAccuracyTests
+```
+
+The fixtures are the author's voice and vocabulary — technical terms, proper nouns and long-form dictation — rather than a public benchmark set, because a good score on somebody else's read-aloud corpus would say nothing about whether the app is usable by the person using it. Each is two files sharing a name in `Tests/CheppuAccuracyTests/Fixtures`: a 16 kHz mono `.wav` and a `.txt` of what was said. Add one by recording it in an app of your own — Voice Memos, or QuickTime Player — and handing the file over:
+
+```sh
+./Scripts/add-an-accuracy-fixture.sh ~/Desktop/recording.m4a long-form-dictation
+```
+
+The script converts rather than records. A script that opened the microphone itself would ask macOS for Microphone access on behalf of your terminal and grant it to everything you ever run there; permissions belong to purpose-built bundles.
+
+The file you recorded is kept in `Tests/CheppuAccuracyTests/Originals` and read by nothing. It is excluded from the build rather than made a resource, so it never reaches the test binary — but the same sentence cannot be said twice, and a fixture downsampled to 16 kHz is not recoverable if the Engine ever hears in at something else.
+
+Every fixture is scored twice, because "wrong" is two questions. **What the Engine heard** forgives the ways two faithful transcripts of the same sounds get written differently — "3" for "three", "core ml" for "CoreML", "you're" for "you are", "quantized" for "quantised" — and is the number comparable with a published speech-recognition rate. **What the user reads** forgives none of them, because they are still words you go back and fix. Both have a ceiling, so a red run says which one moved: Parakeet no longer hearing a word is not the same event as Parakeet rendering it differently.
+
+The ceilings in [`AccuracyCeiling.swift`](./Tests/CheppuAccuracyTests/AccuracyCeiling.swift) are each the first measured rate plus two points, not a target somebody picked, so the test catches Cheppu getting worse rather than asserting a standard it has never met. It runs in CI as a job of its own on an Apple Silicon runner — the only hardware Cheppu supports, and the only hardware a CoreML ceiling means anything on — so that a model load never sits between a push and the answer to "does it still build". The checks that the corpus is a corpus (every fixture has both its halves, and all three kinds of speech are covered) need no Engine and run in the fast suite.
 
 ## Status
 
