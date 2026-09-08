@@ -1,0 +1,25 @@
+LICENSE
+  s_1e5568879aeea0::t_03a0db63ea5352 1-21
+Tests/CheppuHistoryTests/HistoryStoreTests.swift
+  s_1e5568879aeea0::t_0711dda1eb4083 245-256,259-261
+Scripts/make-app.sh
+  s_1e5568879aeea0::t_fa9f347cdfcb9c 2-3,5-18,24,35-46,48-54
+README.md
+  s_1e5568879aeea0::t_f4dc01255cdb5f 97-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "869f1bed19bc65017fbdec22fb3a240b09c931e1",
+  "prompts": {},
+  "sessions": {
+    "s_1e5568879aeea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "247d84e8-cde4-484c-af91-008e9a954636",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
