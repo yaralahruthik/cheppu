@@ -15,10 +15,12 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
     /// not on the machine" is worth far more to somebody reading a log than the
     /// name of the enumeration it came out of.
     public enum Failure: Error, Equatable, FailureSafeToName {
-        /// Asked to transcribe before the Engine was on the machine. The
-        /// Onboarding ticket is what makes sure this never reaches a user; until
-        /// then it is the honest answer rather than a silent 480 MB download in
-        /// the middle of someone's sentence.
+        /// Asked to transcribe before the Engine was on the machine. The first
+        /// launch is what makes sure a user does not meet this — it has them
+        /// fetch the Engine before it has them dictate — and this is what is
+        /// left for the machine whose Engine has since been deleted: the honest
+        /// answer, rather than a silent 480 MB download in the middle of
+        /// someone's sentence.
         case engineNotDownloaded
     }
 

@@ -25,8 +25,9 @@ extension CleanupRule {
 /// looking at Cheppu on purpose, and what they want to know is whether the
 /// thing they granted last month is still granted.
 public enum Permission: CaseIterable, Equatable, Hashable, Sendable {
-    /// To hear the user. Asked for by macOS, inside a prompt, the first time a
-    /// Dictation needs it.
+    /// To hear the user. Asked for by macOS, inside a prompt: by Onboarding, on
+    /// the first launch, and by the first Dictation that needs it on a machine
+    /// that never saw one.
     case microphone
 
     /// To see the Hotkey while another app has focus, and to type the Insertion.

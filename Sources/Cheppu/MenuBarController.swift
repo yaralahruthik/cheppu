@@ -11,11 +11,14 @@ import CheppuSettings
 
 /// Renders the core's `MenuBarMenu` as a status item, performs the action behind
 /// whichever item the user picks, wires a Dictation to the machine it runs on,
-/// and keeps Cheppu watching for the Hotkey.
+/// keeps Cheppu watching for the Hotkey, and puts the first launch on the screen
+/// the one time it is owed.
 ///
 /// This is glue: what it does is assemble and render. The one thing it decides
-/// for itself — fetching the Engine at launch, with nothing shown — is a
-/// placeholder that Onboarding takes over (#20). That is why it is not tested.
+/// for itself is which of the two errands a launch is — the first one, walked
+/// through in a window, or every one after it, where a missing Engine is
+/// fetched quietly behind a Hotkey that already works (ADR-0013). That is why
+/// it is not tested.
 @MainActor
 final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
@@ -55,6 +58,22 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// to it has to be writing to the same file.
     private let diagnostics = DiagnosticsLog()
 
+    /// The Engine: the one object that both transcribes and puts itself on the
+    /// machine.
+    ///
+    /// Held rather than made where each of them is needed, so that the first
+    /// launch's download and the Dictations that follow it are the same Engine
+    /// reading the same directory. Nothing where this account has no
+    /// Application Support to keep it in, which is a Dictation that fails where
+    /// the Engine would have been rather than an app that does not start.
+    private let parakeet = try? ParakeetEngine()
+
+    /// Putting the Engine on the machine, whether or not there is anywhere to
+    /// put it. A first launch with an Engine Download step that did nothing and
+    /// said nothing would be worse than one that says it cannot.
+    private lazy var engineDownload: any EngineDownloadPort =
+        parakeet ?? EngineWithNowhereToLive()
+
     /// Everything the user has set, and the window they set it in.
     ///
     /// One `Preferences` for the whole app rather than one per reader: the menu
@@ -75,6 +94,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// does the watch when it finds it may no longer read the keyboard.
     private lazy var sayingWhatIsMissing = SayingWhatIsMissing(
         setting: preferences, asking: permissions)
+
+    /// The first launch: permissions, the Engine, and one Dictation into a field
+    /// Cheppu owns. Shown once, on the launch that is owed it, and never again.
+    private lazy var onboarding = OnboardingWindow(
+        setting: preferences, asking: permissions, fetching: engineDownload)
 
     private lazy var settingsWindow = SettingsWindow(
         setting: preferences,
@@ -128,7 +152,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// the pasteboard the words are put where the cursor is with, and the Pill
     /// and Cues that say which of those is happening.
     private func runDictations() {
-        let parakeet = try? ParakeetEngine()
         // A machine with nowhere to keep the Engine still gets a Hotkey, and
         // is still asked for Accessibility. What it does not get is a Dictation
         // that can be transcribed, and that is said where it happens rather
@@ -155,24 +178,39 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         self.dictations = dictations
 
-        if let parakeet { putTheEngineOnTheMachine(parakeet) }
+        theFirstLaunchOrWhatItLeftBehind()
         watchForTheHotkey(with: dictations)
     }
 
-    /// Fetches the Engine if it is not here yet, so that the first Dictation
-    /// has something to be transcribed by.
+    /// Shows the first launch on the one launch it is owed, and otherwise makes
+    /// sure the Engine is still where the last one left it.
     ///
-    /// Silent, and at launch rather than when the user asks: Onboarding is
-    /// where a 480 MB download gets a face — a size, real progress, and a first
-    /// Dictation to end on (#20). Until then this is the difference between a
-    /// fresh machine that dictates and one whose Hotkey works and whose words
-    /// go nowhere.
-    private func putTheEngineOnTheMachine(_ engine: ParakeetEngine) {
+    /// The two are the same errand seen from either end. A user who has never
+    /// been through Onboarding is walked through the download with a size and a
+    /// bar in front of them; a user who has is not made to watch it again
+    /// because they moved the folder or Cheppu shipped a new Engine — that one
+    /// is fetched quietly, in the background, while their Hotkey goes on
+    /// working.
+    private func theFirstLaunchOrWhatItLeftBehind() {
+        guard !onboarding.isOwed else {
+            onboarding.show()
+            return
+        }
+        putTheEngineOnTheMachine()
+    }
+
+    /// Fetches the Engine if it is not here yet, so that the next Dictation has
+    /// something to be transcribed by.
+    ///
+    /// Silent, because by here the user has already been shown the download
+    /// once and agreed to it: what is left is the copy of an Engine they
+    /// already have going missing. What an interrupted attempt leaves behind is
+    /// picked up by the next one rather than started over, so a failure here
+    /// costs the next launch nothing.
+    private func putTheEngineOnTheMachine() {
+        let engine = engineDownload
         Task {
             guard await !engine.isEngineDownloaded() else { return }
-            // What an interrupted download leaves behind is picked up by the
-            // next attempt rather than started over, so a failure here costs
-            // the next launch nothing.
             try? await engine.downloadEngine { _ in }
         }
     }
@@ -213,7 +251,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     // nothing.
                     let missing = (error as? HotkeyFailure)?.permission ?? .accessibility
                     missingForTheHotkey = missing
-                    if sayWhy { await sayingWhatIsMissing.askFor(missing) }
+                    // Not while the first launch is on the screen. It is asking
+                    // for these permissions one at a time, with the reason and
+                    // the pane beside each, and an alert over the top of it
+                    // would be Cheppu asking twice — and asking out of the
+                    // order the sequence exists to keep. The moment that window
+                    // is gone, the loop comes round again and says it.
+                    if sayWhy, !onboarding.isShowing { await sayingWhatIsMissing.askFor(missing) }
                     try? await Task.sleep(for: Self.whileWaitingForAccessibility)
                 }
             }
@@ -292,8 +336,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// A permission nobody has answered for yet counts as missing, exactly as it
     /// does in Settings, so a fresh install says it needs the Microphone before
     /// any Dictation has asked for it. Offering the pane is not asking for the
-    /// permission (`docs/product-experience.md` §9), and Onboarding is what
-    /// makes the first run a sequence rather than a menu to read (#20).
+    /// permission (`docs/product-experience.md` §9); Onboarding is what asks,
+    /// on the one launch that walks the user through them.
     private func missingPermissions() -> [Permission] {
         Permission.neededBy(preferences.hotkey()).filter {
             permissions.status(of: $0) == .notGranted || $0 == missingForTheHotkey

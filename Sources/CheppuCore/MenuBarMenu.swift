@@ -90,8 +90,9 @@ public enum MenuBarItem: Equatable, Sendable {
 /// The menu behind Cheppu's menu bar icon.
 ///
 /// It offers History, the Cue switch, Settings and Quit, and — for every
-/// permission Cheppu does not have — says so at the top. Onboarding joins it
-/// when its own ticket lands.
+/// permission Cheppu does not have — says so at the top. Onboarding is not on
+/// it: the first launch is a window that opens itself, once, and an app the
+/// user has already set up has nothing to offer them about it.
 public struct MenuBarMenu: Equatable, Sendable {
     public let items: [MenuBarItem]
 

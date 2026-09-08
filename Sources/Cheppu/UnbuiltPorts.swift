@@ -19,8 +19,21 @@ import CheppuEngine
 /// `docs/product-experience.md` §4 rules out, and each Dictation instead fails
 /// where the Engine would have been, and says so in the Diagnostics Log by the
 /// name of the failure it threw.
-struct EngineWithNowhereToLive: EnginePort {
+///
+/// It stands in for both of the Engine's ports, exactly as `ParakeetEngine`
+/// satisfies both: the first launch has an Engine Download step whether or not
+/// there is anywhere to put what it fetches, and a step that cannot be got past
+/// is better than a button that does nothing and says nothing.
+struct EngineWithNowhereToLive: EnginePort, EngineDownloadPort {
     func transcribe(_ audio: CapturedAudio) async throws -> RawTranscript {
+        throw ParakeetEngine.Failure.engineNotDownloaded
+    }
+
+    func isEngineDownloaded() async -> Bool { false }
+
+    func downloadEngine(
+        reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
+    ) async throws {
         throw ParakeetEngine.Failure.engineNotDownloaded
     }
 }
