@@ -70,6 +70,70 @@ A permission granted once can be taken away later, and macOS tells nobody when t
 
 Choosing the Fn/Globe key as your hotkey adds one more, **Input Monitoring**, and needs the macOS "Press 🌐 key to" setting changed to "Do Nothing" — without both, macOS acts on the press before Cheppu ever sees it. Cheppu explains both at the moment you choose that key, not before, and asks for Input Monitoring then and never otherwise. On any other hotkey it is not asked for, not mentioned, and not a row in Settings.
 
+## Running it locally
+
+There is no release to install yet — the signed, notarized build and the Homebrew cask are still to come — so running Cheppu means building it. That is one certificate and two commands.
+
+### Make a signing identity first
+
+Do this before granting Cheppu anything, and Accessibility gets granted once rather than once per build.
+
+macOS files a permission under the code that asked for it, and it knows that code by its signature. An ad-hoc signature is pinned to the exact bytes it was made from, so every rebuild is a different app to the system: grant Accessibility, rebuild, and the switch in System Settings still reads as on while the hotkey quietly stops arriving — with nothing to be done about it but removing the entry and adding it again. A signature made with the same identity every time is the same app every time, and the grant outlives the rebuild.
+
+Any code signing identity does, and a self-signed one costs a minute: Keychain Access → Certificate Assistant → **Create a Certificate…**, named `Cheppu Local`, identity type **Self Signed Root**, certificate type **Code Signing**.
+
+### Build it and open it
+
+```sh
+CHEPPU_SIGN_IDENTITY="Cheppu Local" ./Scripts/make-app.sh
+open dist/Cheppu.app
+```
+
+Without `CHEPPU_SIGN_IDENTITY` the bundle is signed ad-hoc and the script says so. It runs perfectly well; it is only the grant that does not survive. Run the app from `dist/Cheppu.app` and never with `swift run` — a grant is filed under the bundle that asked for it, so running the executable directly asks for the Microphone and Accessibility on behalf of your terminal and hands them to everything you ever run in it.
+
+There is no Dock icon and no window. Cheppu is the icon in the menu bar.
+
+### What the first launch asks for
+
+One window, one screen at a time, reading what is true this instant rather than counting: a permission you granted last week is a screen you never see, and a relaunch halfway through opens where you left off.
+
+1. **Microphone**, with the macOS prompt behind it.
+2. **Accessibility**, which macOS has no prompt for — the screen says why in a line and has a button that opens the pane it is a switch in. This is the one the hotkey needs.
+3. **The Engine**, 600 MB, started by you rather than on your behalf, and resuming rather than starting over if the connection drops. Already on the machine, and the screen is skipped.
+4. **One dictation**, into a field Cheppu owns, so that a first attempt cannot fail for a reason belonging to somebody else's text box. It counts when text is *pasted* in, so typing your sentence into it will not get you past it.
+5. **The last screen** names your hotkey, and the sequence never appears again.
+
+If Cheppu has been built on this machine before, delete any existing Cheppu row under System Settings → Privacy & Security → Accessibility before granting it again. A row left over from a different signature reads as enabled and does nothing.
+
+### Dictating
+
+The hotkey is the **right Option key** on its own, because it does nothing by itself in any app. Tap it to start and tap again to stop; hold it down and it dictates only while held; press Escape while it is listening and the whole dictation is thrown away — without the key being taken from the app you are in. One you walk away from stops itself after five minutes.
+
+Everything else is in the menu bar: **History…**, **Settings…**, **Play Sounds**, and **Quit Cheppu**, with any permission you are missing named at the top of the menu for as long as it is missing.
+
+### Rebuilding
+
+`make-app.sh` removes `dist/Cheppu.app` before it writes it, so quit Cheppu before building over it:
+
+```sh
+osascript -e 'quit app "Cheppu"'
+CHEPPU_SIGN_IDENTITY="Cheppu Local" ./Scripts/make-app.sh
+open dist/Cheppu.app
+```
+
+Two things do not work from a local build, by design rather than by accident. **Launch at login** needs an installed app, so `SMAppService` refuses to register one run out of `dist/`, and the switch snaps back off rather than claiming a launch that will not happen. **In-app updates** are not built yet.
+
+Everything Cheppu has put on your machine is in one folder, and deleting it is a clean slate:
+
+```
+~/Library/Application Support/Cheppu/
+  Engine/            # the model
+  History.jsonl      # the last 100 dictations: text and a timestamp, nothing else
+  Diagnostics.log    # states and durations, and never a word of what you said
+```
+
+The log is where to look when the hotkey does nothing. `the Hotkey cannot be watched: accessibilityDenied` is what a missing or stale grant says.
+
 ## Building
 
 Cheppu is a Swift package of nine targets. `CheppuCore` is the headless core — it decides what happens and imports no OS framework. `CheppuEngine` is Parakeet, and the one-time download that puts it on the machine. `CheppuAudio` is the microphone: the one place Cheppu opens an audio device and asks for Microphone access. `CheppuKeyboard` is the Hotkey: the one place Cheppu watches keys it was not sent and asks for Accessibility. `CheppuInsertion` is the pasteboard and the one keystroke Cheppu ever types. `CheppuFeedback` is the pill and the sounds: the one place Cheppu draws over another app's window or makes a noise. `CheppuHistory` is the History store and the window it is read in: the one place Cheppu writes what you said to the disk. `CheppuSettings` is everything you can set and the one window you set it in: the only place Cheppu reads or writes a preference. `Cheppu` is the menu bar app that performs what the core decides, including the window the first launch is walked through.
@@ -91,8 +155,6 @@ swift test                      # run the suite
 ./Scripts/check-the-log-says-nothing-of-what-was-said.sh
 ./Scripts/add-an-accuracy-fixture.sh <recording> <name>   # add to the accuracy corpus
 ```
-
-Run the app from `dist/Cheppu.app`, not with `swift run`. macOS files a Microphone or Accessibility grant under the bundle that asked for it, so running the executable directly asks for both on behalf of your terminal and grants them to everything you ever run in it.
 
 The suite runs with no permissions granted, no Engine downloaded, no network and no audio device. Nothing in it opens a microphone, creates an event tap, touches your clipboard, types a key, puts a window on your screen or makes a sound, and the only files it writes are in a temporary directory of its own — your own History is never opened, read or cleared by it, and the only preferences it writes are in a domain of its own, so nothing you set is changed by it — so running it never asks your terminal for Microphone or Accessibility access, never disturbs what you had copied, and is silent. Running it needs a toolchain that ships the Swift Testing runtime, which today means Xcode; the Command Line Tools alone can build the app but not run the suite. See [ADR-0003](./docs/adr/0003-swift-package-manager-instead-of-an-xcode-project.md).
 

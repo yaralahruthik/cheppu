@@ -242,13 +242,23 @@ struct HistoryStoreTests {
         // to this account, is not shared with another one, and is not synced
         // anywhere. Under `Cheppu/`, next to the Engine, so that everything
         // Cheppu put on the machine is in one place the user can delete.
-        // Worked out, never made: asking where History goes creates no folder,
-        // so the suite writes nowhere but the temporary directory above.
+        let folder = NSHomeDirectory() + "/Library/Application Support/Cheppu/"
+        let file = folder + HistoryFile.name
+
+        // Worked out, never made: asking where History goes creates no folder
+        // and no file, so the suite writes nowhere but the temporary directory
+        // above. Read on both sides of the question rather than asserted to be
+        // absent — on a machine where Cheppu has been used they are both there
+        // already, and "the author has never run their own app" is not the
+        // promise this test is here to keep.
+        let folderWasThere = FileManager.default.fileExists(atPath: folder)
+        let fileWasThere = FileManager.default.fileExists(atPath: file)
+
         let location = try HistoryFile.defaultLocation()
 
-        #expect(location.path.hasPrefix(NSHomeDirectory() + "/Library/Application Support/Cheppu/"))
-        #expect(location.lastPathComponent == "History.jsonl")
-        #expect(!FileManager.default.fileExists(atPath: location.path))
+        #expect(location.path == file)
+        #expect(FileManager.default.fileExists(atPath: folder) == folderWasThere)
+        #expect(FileManager.default.fileExists(atPath: file) == fileWasThere)
     }
 
     private static func permissions(of url: URL) throws -> Int {
