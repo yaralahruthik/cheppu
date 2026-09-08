@@ -17,6 +17,30 @@ public struct EngineDownloadProgress: Equatable, Sendable {
         self.totalBytes = totalBytes
     }
 
+    /// What has arrived and what there is, in the words the user reads under
+    /// the bar: "212 MB of 604 MB".
+    ///
+    /// Megabytes of a million bytes, as the Finder and the App Store count
+    /// them, and whole ones: a first decimal place moving ten times a second is
+    /// noise, and the question this answers is "how much longer" rather than
+    /// "exactly how far".
+    ///
+    /// Spelled out here rather than by `ByteCountFormatter`, which is the
+    /// obvious way to write this and the wrong one twice over: it belongs to a
+    /// framework the core does not import, and what it produces depends on the
+    /// machine's locale, which would make this sentence something the suite
+    /// could only assert about the machine it happened to run on.
+    public var howFarAlong: String {
+        "\(Self.megabytes(downloadedBytes)) MB of \(Self.megabytes(totalBytes)) MB"
+    }
+
+    /// Bytes, to the nearest megabyte. Rounded rather than truncated, so that a
+    /// download one byte short of its total does not read as a megabyte short
+    /// of it.
+    private static func megabytes(_ bytes: Int64) -> Int64 {
+        (bytes + 500_000) / 1_000_000
+    }
+
     /// How far along, in [0, 1].
     ///
     /// Nothing to fetch reads as finished rather than as a division by zero, and

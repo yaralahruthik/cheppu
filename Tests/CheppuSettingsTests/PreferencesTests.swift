@@ -154,4 +154,36 @@ struct PreferencesTests {
             #expect(preferences.areCuesOn() == false)
         }
     }
+
+    // MARK: - Onboarding
+
+    @Test("A fresh install has not been through the first launch")
+    func aFreshInstallHasNotBeenThroughTheFirstLaunch() {
+        Self.inADomainOfItsOwn { preferences, _ in
+            // The one thing Cheppu remembers that is off unless it has been
+            // written. Every switch beside it is on by default; a first launch
+            // that read as done would be the one launch nobody ever sees.
+            #expect(preferences.hasFinishedOnboarding() == false)
+        }
+    }
+
+    @Test("Onboarding does not come back once it has been finished")
+    func onboardingDoesNotComeBackOnceItHasBeenFinished() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            preferences.finishOnboarding()
+
+            // A second `Preferences` over the same domain is what the next
+            // launch is.
+            #expect(Preferences(in: defaults).hasFinishedOnboarding())
+        }
+    }
+
+    @Test("Asking whether the first launch is over does not end it")
+    func askingWhetherTheFirstLaunchIsOverDoesNotEndIt() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            _ = preferences.hasFinishedOnboarding()
+
+            #expect(defaults.object(forKey: Preferences.Key.onboardingIsDone) == nil)
+        }
+    }
 }

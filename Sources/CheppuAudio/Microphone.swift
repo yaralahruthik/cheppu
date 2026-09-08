@@ -123,8 +123,11 @@ final class SystemMicrophone: Microphone, @unchecked Sendable {
 ///
 /// Public, and separate from asking, because Settings has to be able to say
 /// whether the permission is there without a prompt appearing and without a
-/// Dictation being started to find out (`docs/product-experience.md` §9). The
-/// asking stays where it was: inside the Dictation that needs it.
+/// Dictation being started to find out (`docs/product-experience.md` §9).
+/// Asking is the other half, below, and there are two moments worth doing it
+/// in: the first launch, where it is the step the user is on, and every
+/// Dictation, which asks on its way into the microphone rather than trusting an
+/// answer given a month ago.
 ///
 /// Never asked and refused are one answer here. They are a difference to macOS
 /// and not to the user: either way Cheppu cannot hear them, and either way the
@@ -132,6 +135,21 @@ final class SystemMicrophone: Microphone, @unchecked Sendable {
 public enum MicrophonePermission {
     public static var isGranted: Bool {
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
+
+    /// Asks for it, which is what puts the macOS prompt on screen the first
+    /// time, and answers whether Cheppu may listen.
+    ///
+    /// Called by Onboarding, where asking is the whole of the step the user is
+    /// on, and by nobody else: every Dictation asks for itself, on its way into
+    /// the microphone. macOS shows the prompt once and answers from the
+    /// decision on record ever afterwards — including answering no, silently,
+    /// for a grant that has since been taken away — which is why what this
+    /// returns is a screen that moves on rather than a screen that keeps
+    /// offering a prompt nobody will see again.
+    @discardableResult
+    public static func request() async -> Bool {
+        await SystemMicrophoneAccess().request()
     }
 }
 

@@ -29,6 +29,7 @@ public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked 
     enum Key {
         static let cuesAreOn = "CuesAreOn"
         static let hotkey = "Hotkey"
+        static let onboardingIsDone = "OnboardingIsDone"
 
         static func cleanup(_ rule: CleanupRule) -> String {
             switch rule {
@@ -73,6 +74,30 @@ public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked 
     /// different Hotkey.
     public func choose(_ hotkey: Hotkey) {
         defaults.set(hotkey.written, forKey: Key.hotkey)
+    }
+
+    /// Whether the user has been through the first launch.
+    ///
+    /// The one thing Cheppu remembers that is not a switch the user can move:
+    /// Onboarding asks for the permissions, fetches the Engine and has them
+    /// dictate once, and a sequence that appeared again afterwards would be an
+    /// app asking somebody to prove something they have already proved.
+    ///
+    /// Not `isOn`, which answers yes to a key nobody has written: a fresh
+    /// install has not been onboarded, and reading it as though it had would
+    /// mean the one launch this exists for is the one launch that never shows
+    /// it.
+    public func hasFinishedOnboarding() -> Bool {
+        defaults.bool(forKey: Key.onboardingIsDone)
+    }
+
+    /// Remembers that the first launch is over, so it never happens again.
+    ///
+    /// Written when the user reaches the end of the sequence rather than as
+    /// they go: somebody who closed the window at the Engine Download has not
+    /// dictated yet, and the next launch owes them the rest of it.
+    public func finishOnboarding() {
+        defaults.set(true, forKey: Key.onboardingIsDone)
     }
 
     /// Whether a Dictation makes a sound.
