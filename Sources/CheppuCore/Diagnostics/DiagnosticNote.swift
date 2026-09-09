@@ -61,6 +61,22 @@ public enum DiagnosticNote: Equatable, Sendable {
     /// writing down.
     case theHotkeyCouldNotBeWatched(FailureName)
 
+    /// The Engine heard the audio a second time, to find where a Spelling was
+    /// said, and this is how long that took.
+    ///
+    /// The one note that carries a measurement rather than being timed by the
+    /// gap to the line before it. Every other timing in the log is the distance
+    /// between two things that happened; this one happens inside a single move
+    /// from Transcribing to Inserting, so a reader with a stop-to-insert budget
+    /// that has been missed could otherwise tell that the Engine was slow and
+    /// not whether it was the Spellings that made it so (ADR-0014).
+    ///
+    /// It says how long and nothing else. Which Spellings were read, how many
+    /// there were, and whether any of them was put in are all things about what
+    /// the user said, and none of them is in here — a `Duration` is a number,
+    /// and a number cannot hold a word.
+    case spellingsWereRead(Duration)
+
     /// Notes were taken faster than the disk would take them, and this many
     /// were let go of.
     ///

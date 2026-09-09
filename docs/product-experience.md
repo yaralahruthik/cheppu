@@ -64,7 +64,7 @@ Each macOS permission is requested exactly when it is first needed, with one sen
 
 ## 10. Privacy is structural, not a policy
 
-Audio and text stay on the machine. This is not a setting or a promise. The app has no network code paths after the model download. Audio is discarded after transcription. History holds text only, is stored locally, and can be cleared in one action.
+Audio and text stay on the machine. This is not a setting or a promise. The app has no network access except to fetch the engine. Audio is discarded after transcription. History holds text only, is stored locally, and can be cleared in one action.
 
 ## 11. Settings fit on one screen
 

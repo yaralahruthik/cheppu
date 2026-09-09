@@ -18,7 +18,9 @@ import Foundation
 /// `UserDefaults` is documented as thread-safe and is reachable from wherever a
 /// Dictation happens to be running; Swift cannot see that, so the promise is
 /// made here rather than by wrapping it in an actor nothing would gain from.
-public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked Sendable {
+public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, SpellingsSwitch,
+    @unchecked Sendable
+{
     /// The keys, named for what they hold rather than for the row that shows
     /// them, so that renaming a control in the window cannot silently forget
     /// what the user chose.
@@ -30,6 +32,7 @@ public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked 
         static let cuesAreOn = "CuesAreOn"
         static let hotkey = "Hotkey"
         static let onboardingIsDone = "OnboardingIsDone"
+        static let spellingsAreRead = "SpellingsAreRead"
 
         static func cleanup(_ rule: CleanupRule) -> String {
             switch rule {
@@ -112,6 +115,26 @@ public struct Preferences: CueSwitch, CleanupSwitches, HotkeyChoice, @unchecked 
     /// Turns the Cues on or off, for a user dictating in a meeting.
     public func turnCues(on: Bool) {
         defaults.set(on, forKey: Key.cuesAreOn)
+    }
+
+    /// Whether the Engine reads the user's Spellings.
+    ///
+    /// Answered without suspending, unlike the port it satisfies, so that the
+    /// Settings window can draw the row from it as it is being opened.
+    ///
+    /// On unless the user has said otherwise, like every other switch — and it
+    /// costs a user who has never corrected a word nothing, because there is
+    /// nothing to read and no second pass to run until the first Spelling
+    /// exists (ADR-0014).
+    public func areSpellingsRead() -> Bool {
+        isOn(Key.spellingsAreRead)
+    }
+
+    /// Stops the Engine reading them, for a user ruling out a Spelling they
+    /// suspect of misfiring. Off keeps them: this is not the action that
+    /// forgets them, which is the store's.
+    public func turnSpellings(on: Bool) {
+        defaults.set(on, forKey: Key.spellingsAreRead)
     }
 
     /// Which Cleanup rules a Dictation's words go through.

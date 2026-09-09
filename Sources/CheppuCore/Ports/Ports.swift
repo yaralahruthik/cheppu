@@ -127,6 +127,28 @@ public protocol EngineDownloadPort: Sendable {
     func downloadEngine(
         reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
     ) async throws
+
+    /// Whether the part of the Engine that only Spellings need is on the
+    /// machine.
+    ///
+    /// Answered from disk, without the network, like the question above it: it
+    /// is asked every time the Settings window or the History window is drawn,
+    /// and neither of those is a moment the user chose to spend their
+    /// connection on.
+    func isTheSpellingsPartDownloaded() async -> Bool
+
+    /// Fetches that part, reporting progress as it arrives.
+    ///
+    /// Called only where somebody pressed a button. A download the user did not
+    /// start, on a connection they did not choose to spend, is the stall
+    /// `docs/product-experience.md` §12 warns about — so this is never called
+    /// at launch, and never on the way past (ADR-0014).
+    ///
+    /// Resumable on the same terms as the first part: an attempt that stopped
+    /// is picked up where it stopped by the next press of either button.
+    func downloadTheSpellingsPart(
+        reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
+    ) async throws
 }
 
 /// Placing Final Text at the text cursor of the Target App.
@@ -177,6 +199,30 @@ public protocol HistoryPort: Sendable {
     /// Appends one Dictation's Final Text. Called before Insertion is attempted,
     /// on every path out of Transcribing.
     func append(_ entry: HistoryEntry) async throws
+}
+
+/// The Spellings the Engine reads.
+///
+/// Read rather than held, exactly as the Cue switch and the Cleanup rules are,
+/// and read at the Dictation that is about to be transcribed rather than at
+/// launch (ADR-0010). A Spelling left behind by a Correction made a moment ago
+/// is therefore read by the very next thing the user says, with nothing to keep
+/// in step and nothing to restart.
+///
+/// Separate from the switch below because they are two questions with two
+/// answers: what the user has taught Cheppu, and whether Cheppu is listening
+/// for it. Off keeps the Spellings and stops reading them.
+public protocol SpellingsPort: Sendable {
+    func spellings() async -> Spellings
+}
+
+/// Whether the Engine reads the user's Spellings.
+///
+/// One line of the Settings window, read where it is used, so that a Spelling
+/// suspected of misfiring can be ruled out in one flick and put back in
+/// another (ADR-0010).
+public protocol SpellingsSwitch: Sendable {
+    func areSpellingsRead() async -> Bool
 }
 
 /// Whether the Cues may be heard.

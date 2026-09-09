@@ -39,6 +39,8 @@ struct DiagnosticsLogTests {
             .theHotkeyCouldNotBeWatched(FailureName(of: HotkeyFailure.accessibilityDenied)),
             .somethingFailed(FailureName(of: AudioCaptureFailure.noMicrophone)),
             .permissionMissing(.microphone),
+            .notesWereDropped(3),
+            .spellingsWereRead(.milliseconds(120)),
         ]
         + DiagnosticNote.WhatHappened.allCases.map {
             .dictationMoved(from: .listening, to: .transcribing, by: $0)

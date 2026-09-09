@@ -161,6 +161,15 @@ public enum SettingsControl: Equatable, Sendable {
     /// What History holds, and the one action that empties it (ADR-0009).
     case history
 
+    /// The Spellings a Correction left behind: whether the Engine reads them,
+    /// how many there are, and the one action that forgets them all — or, while
+    /// the part of the Engine they need is missing, that it is and the offer to
+    /// fetch it (ADR-0014).
+    ///
+    /// It carries the row rather than restating it, because the History window
+    /// shows the same thing and the two must say it the same way.
+    case spellings(SpellingsRow)
+
     /// The line the user reads.
     public var title: String {
         switch self {
@@ -173,6 +182,7 @@ public enum SettingsControl: Equatable, Sendable {
         case .launchAtLogin: "Launch Cheppu at login"
         case .permission(let permission, _): permission.name
         case .history: "History"
+        case .spellings(let row): row.title
         }
     }
 
@@ -197,6 +207,7 @@ public enum SettingsControl: Equatable, Sendable {
         case .launchAtLogin: "Takes effect the next time you log in."
         case .permission(let permission, _): permission.reason
         case .history: "The last \(History.capacity) dictations, kept on this Mac and nowhere else."
+        case .spellings(let row): row.explanation
         }
     }
 
@@ -206,6 +217,7 @@ public enum SettingsControl: Equatable, Sendable {
     public var isOn: Bool? {
         switch self {
         case .cleanupRule(_, let isOn), .cues(let isOn), .launchAtLogin(let isOn): isOn
+        case .spellings(let row): row.isOn
         case .hotkey, .permission, .history: nil
         }
     }
@@ -223,7 +235,7 @@ public enum SettingsControl: Equatable, Sendable {
         case .hotkey(_, isBeingChosen: true): "Press a key…"
         case .hotkey(let hotkey, _): hotkey.name
         case .permission(_, let status): status.name
-        case .cleanupRule, .cues, .launchAtLogin, .history: nil
+        case .cleanupRule, .cues, .launchAtLogin, .history, .spellings: nil
         }
     }
 
@@ -245,6 +257,11 @@ public enum SettingsControl: Equatable, Sendable {
         // No ellipsis: nothing is asked first. Somebody reaching for this has
         // had someone walk up behind them (`docs/product-experience.md` §10).
         case .history: "Clear History"
+        // Emptying History leaves the Spellings, and this leaves History: they
+        // are two things the user asked Cheppu to keep and two things they can
+        // ask it to forget, and one action doing both would be one of them
+        // forgotten by accident (ADR-0014).
+        case .spellings(let row): row.action
         case .cleanupRule, .cues, .launchAtLogin: nil
         }
     }
@@ -300,13 +317,19 @@ public struct SettingsScreen: Equatable, Sendable {
     ///   - permissions: what macOS says about each permission this instant. One
     ///     nobody answered for is shown as not granted: a row that quietly went
     ///     missing would be the one the user came to check.
+    ///   - spellings: what the user has taught Cheppu and whether it is being
+    ///     read — or, while the part of the Engine that reads them is missing,
+    ///     that it is. The row is always on the screen, even with nothing
+    ///     taught yet: it is where a user finds out that correcting a word in
+    ///     History is a thing Cheppu does anything with.
     public init(
         hotkey: Hotkey,
         isChoosingAHotkey: Bool = false,
         cleanup: CleanupRules,
         areCuesOn: Bool,
         launchesAtLogin: Bool,
-        permissions: [Permission: PermissionStatus]
+        permissions: [Permission: PermissionStatus],
+        spellings: SpellingsRow
     ) {
         self.sections = [
             Section(
@@ -326,6 +349,7 @@ public struct SettingsScreen: Equatable, Sendable {
                 }
             ),
             Section(title: "History", controls: [.history]),
+            Section(title: "Spellings", controls: [.spellings(spellings)]),
         ]
     }
 }

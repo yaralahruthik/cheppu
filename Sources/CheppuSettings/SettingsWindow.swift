@@ -30,6 +30,38 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     /// (ADR-0009).
     private let clearHistory: () -> Void
 
+    /// What the Spellings row reads this instant: how many there are, or that
+    /// the part of the Engine that reads them is missing or on its way.
+    ///
+    /// Asked rather than held, like everything else on this screen — but asked
+    /// with a suspension, because the answer is a file and a directory rather
+    /// than a preference. So it is read on the way in and the screen is drawn
+    /// again when it arrives, which is a fraction of a second the user spends
+    /// looking at a row that says nothing rather than at no window at all.
+    private let readSpellings: () async -> SpellingsRow
+
+    /// Forgets every Spelling, which is the store's to do and not this
+    /// window's — and which emptying History does not do (ADR-0014).
+    private let forgetSpellings: () -> Void
+
+    /// Fetches the part of the Engine that reads them. Nothing happens until
+    /// this is called, and nothing calls it but a button.
+    private let fetchTheSpellingsPart: () -> Void
+
+    /// What the row said last time it was asked. Drawn from until the answer
+    /// arrives, so that opening the window twice does not flicker through a
+    /// row that has forgotten what it knew.
+    ///
+    /// Seeded from the switch, which is a preference and answers on the spot
+    /// (ADR-0010), and from nothing taught — the reading in which the row says
+    /// least. Not from the part being missing, which would be the pessimistic
+    /// seed the permission rows take and is the wrong one here: "not granted"
+    /// is a true thing to say about a permission nobody has answered for, while
+    /// offering a 103 MB download for something already on the machine is a
+    /// sentence the user would act on.
+    private lazy var spellings: SpellingsRow = .theEngineCanReadThem(
+        areOn: preferences.areSpellingsRead(), howMany: 0)
+
     /// Says the Hotkey has moved, so that whoever is watching the keyboard
     /// watches for the new one. Cheppu is not told which key it is: it reads
     /// that where it uses it, exactly as it reads every other switch
@@ -55,12 +87,18 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
         launchingAtLogin launchAtLogin: LaunchAtLogin = LaunchAtLogin(),
         asking permissions: any Permissions,
         clearingHistory clearHistory: @escaping () -> Void,
+        readingSpellings readSpellings: @escaping () async -> SpellingsRow,
+        forgettingSpellings forgetSpellings: @escaping () -> Void,
+        fetchingTheSpellingsPart fetchTheSpellingsPart: @escaping () -> Void,
         whenTheHotkeyMoves hotkeyMoved: @escaping () -> Void
     ) {
         self.preferences = preferences
         self.launchAtLogin = launchAtLogin
         self.permissions = permissions
         self.clearHistory = clearHistory
+        self.readSpellings = readSpellings
+        self.forgetSpellings = forgetSpellings
+        self.fetchTheSpellingsPart = fetchTheSpellingsPart
         self.hotkeyMoved = hotkeyMoved
         super.init()
     }
@@ -75,6 +113,7 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
         self.window = window
 
         fill()
+        askWhatTheSpellingsRowSays()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
@@ -136,6 +175,23 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
     public func redrawIfShowing() {
         guard window?.isVisible == true else { return }
         fill()
+        askWhatTheSpellingsRowSays()
+    }
+
+    /// Reads the Spellings row and draws the screen again with it.
+    ///
+    /// Separate from `fill()` because it suspends and `fill()` does not: every
+    /// other row on this screen is a preference or a question macOS answers on
+    /// the spot, and a window that waited for a file before it appeared would
+    /// be a window that appeared late for the sake of one line.
+    private func askWhatTheSpellingsRowSays() {
+        Task {
+            let says = await readSpellings()
+            guard says != spellings else { return }
+            spellings = says
+            guard window?.isVisible == true else { return }
+            fill()
+        }
     }
 
     @objc private func cameBackToTheFront() {
@@ -165,7 +221,8 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
             launchesAtLogin: launchAtLogin.isOn,
             permissions: Permission.neededBy(hotkey).reduce(into: [:]) { statuses, permission in
                 statuses[permission] = permissions.status(of: permission)
-            }
+            },
+            spellings: spellings
         )
 
         for section in screen.sections {
@@ -210,6 +267,8 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
         if let isOn = control.isOn {
             return SwitchRow(control, isOn: isOn) { [weak self] moved in
                 self?.move(control, on: moved)
+            } acted: { [weak self] in
+                self?.act(on: control)
             }
         }
 
@@ -228,6 +287,12 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
             // line here, and the menu is filled as it opens: it is already
             // saying what this window just did.
             preferences.turnCues(on: on)
+        case .spellings:
+            // Off keeps them and stops reading them, so a Spelling suspected of
+            // misfiring can be ruled out in one flick and put back in another
+            // (ADR-0014). Nothing is forgotten by this, and nothing is told:
+            // the Engine reads the switch where it uses it (ADR-0010).
+            preferences.turnSpellings(on: on)
         case .launchAtLogin:
             // Drawn again from what the system says afterwards rather than from
             // what was asked for: a registration that would not take must not
@@ -280,7 +345,25 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
             // empty History is the difference between a promise kept and a
             // promise explained (`docs/product-experience.md` §10).
             clearHistory()
+        case .spellings(let row):
+            act(on: row)
         case .cleanupRule, .cues, .launchAtLogin:
+            break
+        }
+    }
+
+    /// The one button the Spellings row has, whichever button that is.
+    ///
+    /// Which one it is is the row's, decided in the core beside the sentence
+    /// above it, so that a screen offering to fetch something already here — or
+    /// to forget nothing — is not a thing this window can draw.
+    private func act(on row: SpellingsRow) {
+        switch row {
+        case .theEngineCanReadThem:
+            forgetSpellings()
+        case .thePartIsMissing:
+            fetchTheSpellingsPart()
+        case .thePartIsArriving:
             break
         }
     }
@@ -365,9 +448,18 @@ public final class SettingsWindow: NSObject, NSWindowDelegate {
 @MainActor
 private final class SwitchRow: NSView {
     private let moved: (Bool) -> Void
+    private let acted: () -> Void
 
-    init(_ control: SettingsControl, isOn: Bool, moved: @escaping (Bool) -> Void) {
+    /// - Parameter acted: what the row's button does, where it has one. Only
+    ///   the Spellings row does: it is both a decision the user makes — whether
+    ///   the Engine reads them — and a thing they hold, which they can ask
+    ///   Cheppu to forget (ADR-0014).
+    init(
+        _ control: SettingsControl, isOn: Bool, moved: @escaping (Bool) -> Void,
+        acted: @escaping () -> Void
+    ) {
         self.moved = moved
+        self.acted = acted
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -377,6 +469,26 @@ private final class SwitchRow: NSView {
         box.translatesAutoresizingMaskIntoConstraints = false
         addSubview(box)
 
+        // Placed first where there is one, because it is what the rest of the
+        // row has to fit beside — the same reason `ReadingRow` places its
+        // button before its lines.
+        let button = control.action.map { action -> NSButton in
+            let button = NSButton(title: action, target: self, action: #selector(pressed))
+            button.bezelStyle = .rounded
+            button.controlSize = .small
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+            addSubview(button)
+            NSLayoutConstraint.activate([
+                button.centerYAnchor.constraint(equalTo: box.centerYAnchor),
+                button.trailingAnchor.constraint(equalTo: trailingAnchor),
+                button.leadingAnchor.constraint(
+                    greaterThanOrEqualTo: box.trailingAnchor, constant: 12),
+            ])
+            return button
+        }
+
         NSLayoutConstraint.activate([
             box.topAnchor.constraint(equalTo: topAnchor),
             box.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -385,6 +497,9 @@ private final class SwitchRow: NSView {
 
         guard let said = control.explanation else {
             box.bottomAnchor.constraint(equalTo: bottomAnchor).isActive = true
+            if let button {
+                bottomAnchor.constraint(greaterThanOrEqualTo: button.bottomAnchor).isActive = true
+            }
             return
         }
 
@@ -411,6 +526,10 @@ private final class SwitchRow: NSView {
 
     @objc private func flicked(_ sender: NSButton) {
         moved(sender.state == .on)
+    }
+
+    @objc private func pressed() {
+        acted()
     }
 }
 

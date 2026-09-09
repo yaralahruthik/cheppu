@@ -36,4 +36,12 @@ struct EngineWithNowhereToLive: EnginePort, EngineDownloadPort {
     ) async throws {
         throw ParakeetEngine.Failure.engineNotDownloaded
     }
+
+    func isTheSpellingsPartDownloaded() async -> Bool { false }
+
+    func downloadTheSpellingsPart(
+        reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
+    ) async throws {
+        throw ParakeetEngine.Failure.engineNotDownloaded
+    }
 }
