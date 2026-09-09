@@ -44,7 +44,40 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// that the Dictation writing to History and the window reading it are the
     /// same store.
     private let history = HistoryStore()
-    private lazy var historyWindow = HistoryWindow(reading: history)
+
+    /// What the user has taught Cheppu by correcting a word, and where it is
+    /// kept. Held here for the reason History is: the Engine reads this store
+    /// and the History window writes to it, and they have to be the same one.
+    private let spellings = SpellingsStore()
+
+    /// What both windows ask when they draw the Spellings row. One closure
+    /// rather than one each, so the two cannot come to ask different things.
+    private lazy var theSpellingsRow: @Sendable () async -> SpellingsRow = {
+        [weak self] in await self?.whatTheSpellingsRowSays() ?? .thePartIsMissing
+    }
+
+    private lazy var historyWindow = HistoryWindow(
+        reading: history,
+        teaching: spellings,
+        showingTheSpellingsRow: theSpellingsRow,
+        fetchingTheSpellingsPart: { [weak self] in self?.fetchTheSpellingsPart() },
+        // The Settings row counts the Spellings, and may be open behind this
+        // window while the user corrects a word.
+        whenSpellingsMove: { [weak self] in self?.settingsWindow.redrawIfShowing() }
+    )
+
+    /// The fetch of the second part of the Engine, while one is under way.
+    ///
+    /// Held so that the two buttons that start it — the one in the History
+    /// window and the one on the Settings row — are two ways to press the same
+    /// thing rather than two downloads of the same 103 MB.
+    private var fetchingTheSpellingsPart: Task<Void, Never>?
+
+    /// How much of it has arrived, while it is arriving. Nothing at every other
+    /// moment, including after an attempt that stopped: a fetch that ended is
+    /// picked up by the next press of either button and never at launch
+    /// (ADR-0014).
+    private var theSpellingsPartSoFar: EngineDownloadProgress?
 
     /// The permission standing between Cheppu and the Hotkey, or nothing where
     /// it is being watched. Everything the menu says about a Hotkey that does
@@ -66,7 +99,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// reading the same directory. Nothing where this account has no
     /// Application Support to keep it in, which is a Dictation that fails where
     /// the Engine would have been rather than an app that does not start.
-    private let parakeet = try? ParakeetEngine()
+    private lazy var parakeet = try? ParakeetEngine(
+        // Read at each Dictation rather than handed over once, exactly as the
+        // Cleanup switches are: a Spelling left behind a moment ago is read by
+        // the very next thing the user says (ADR-0010).
+        readingSpellings: spellings,
+        when: preferences,
+        writingDownTo: diagnostics
+    )
 
     /// Putting the Engine on the machine, whether or not there is anywhere to
     /// put it. A first launch with an Engine Download step that did nothing and
@@ -104,6 +144,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setting: preferences,
         asking: permissions,
         clearingHistory: { [weak self] in self?.emptyHistory() },
+        readingSpellings: theSpellingsRow,
+        forgettingSpellings: { [weak self] in self?.forgetEverySpelling() },
+        fetchingTheSpellingsPart: { [weak self] in self?.fetchTheSpellingsPart() },
         // A Hotkey chosen in the window is watched for by the next press, with
         // no relaunch: the watch reads the key where it uses it, so all that is
         // needed is to watch again (ADR-0010).
@@ -356,6 +399,80 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // still listing what they have just asked Cheppu to forget.
             historyWindow.redrawIfShowing()
         }
+    }
+
+    /// What both windows say about the user's Spellings, answered in one place
+    /// so that the two cannot come to disagree.
+    ///
+    /// A fetch under way outranks everything: while the bytes are arriving the
+    /// row says so, whichever window is showing it.
+    private func whatTheSpellingsRowSays() async -> SpellingsRow {
+        if let theSpellingsPartSoFar { return .thePartIsArriving(theSpellingsPartSoFar) }
+        guard await engineDownload.isTheSpellingsPartDownloaded() else { return .thePartIsMissing }
+        return .theEngineCanReadThem(
+            areOn: preferences.areSpellingsRead(), howMany: await spellings.spellings().count)
+    }
+
+    /// Fetches the part of the Engine that reads Spellings, because somebody
+    /// pressed a button.
+    ///
+    /// Never at launch and never on the way past. A fetch already under way is
+    /// left alone rather than restarted: the second button is the same button,
+    /// and what an interrupted attempt left behind is picked up by the next
+    /// press rather than fetched again (ADR-0014).
+    private func fetchTheSpellingsPart() {
+        guard fetchingTheSpellingsPart == nil else { return }
+
+        let engine = engineDownload
+        // Opened at the committed figure — the one the button the user just
+        // pressed had on it — and replaced by the repository's own total the
+        // moment the first bytes land. A bar that started blank would be a
+        // download that looks like nothing happening (`docs/product-experience.md` §12).
+        theSpellingsPartSoFar = EngineDownloadProgress(
+            downloadedBytes: 0, totalBytes: SpellingsPartOfTheEngine.bytes)
+        redrawWhereSpellingsAreShown()
+
+        fetchingTheSpellingsPart = Task { [weak self] in
+            // The reports arrive on whichever thread the bytes landed on, so
+            // each is handed back to the main actor before it touches a window.
+            try? await engine.downloadTheSpellingsPart { arrived in
+                Task { @MainActor in self?.theSpellingsPartArrived(arrived) }
+            }
+            // Whether it finished or stopped, the row goes back to asking the
+            // disk: a fetch that failed halfway leaves the part missing and the
+            // offer standing, which is the truth about what the machine has.
+            self?.fetchingTheSpellingsPart = nil
+            self?.theSpellingsPartSoFar = nil
+            self?.redrawWhereSpellingsAreShown()
+        }
+    }
+
+    private func theSpellingsPartArrived(_ progress: EngineDownloadProgress) {
+        // Only while the fetch is still the one this belongs to. A report can
+        // arrive after the transfer that made it has ended, and a bar that came
+        // back after the row had gone would be a window saying a download was
+        // under way when none is.
+        guard fetchingTheSpellingsPart != nil else { return }
+        theSpellingsPartSoFar = progress
+        redrawWhereSpellingsAreShown()
+    }
+
+    /// Forgets every Spelling, from the button on the Settings row.
+    ///
+    /// It empties Spellings and only Spellings: History is a different store
+    /// with a different button, and one action doing both would be one of them
+    /// forgotten by accident (ADR-0014).
+    private func forgetEverySpelling() {
+        Task {
+            try? await spellings.forgetEverything()
+            redrawWhereSpellingsAreShown()
+        }
+    }
+
+    /// Draws both windows that show Spellings, wherever either is open.
+    private func redrawWhereSpellingsAreShown() {
+        settingsWindow.redrawIfShowing()
+        historyWindow.redrawIfShowing()
     }
 
     @objc private func menuBarItemPicked(_ sender: NSMenuItem) {

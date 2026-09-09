@@ -111,6 +111,40 @@ struct ParakeetEngineTests {
         #expect(await Self.engine(in: directory).isEngineDownloaded() == false)
     }
 
+    @Test("The part only Spellings need is a folder of its own, beside the first")
+    func thePartOnlySpellingsNeedIsAFolderOfItsOwnBesideTheFirst() throws {
+        // Everything Cheppu put on the machine is still one folder, so that
+        // what the user deletes when they are done with it is still one drag
+        // (ADR-0009, ADR-0014).
+        let applicationSupport = URL(filePath: "/tmp/somebodys-application-support")
+        let first = EngineFiles.directory(inApplicationSupport: applicationSupport)
+        let second = EngineFiles.spellingsDirectory(inApplicationSupport: applicationSupport)
+
+        #expect(first.deletingLastPathComponent() == second.deletingLastPathComponent())
+        #expect(first.deletingLastPathComponent().lastPathComponent == "Engine")
+        #expect(first != second)
+    }
+
+    @Test("An Engine without the part that reads Spellings says so")
+    func anEngineWithoutThePartThatReadsSpellingsSaysSo() async throws {
+        let directory = Self.emptyDirectory()
+        let spellings = Self.emptyDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.removeItem(at: spellings)
+        }
+        try Self.fakeADownloadedEngine(in: directory)
+
+        // The first part being here says nothing about the second: it is a
+        // different repository, fetched at a different moment, and only where
+        // somebody pressed a button.
+        let engine = ParakeetEngine(
+            directory: directory, spellingsDirectory: spellings, configuration: .ephemeral)
+
+        #expect(await engine.isEngineDownloaded())
+        #expect(await engine.isTheSpellingsPartDownloaded() == false)
+    }
+
     @Test("Asking an Engine that is not here to transcribe says so rather than downloading it")
     func askingAnEngineThatIsNotHereToTranscribeSaysSo() async throws {
         let directory = Self.emptyDirectory()

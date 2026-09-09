@@ -35,7 +35,7 @@ struct EngineDownload {
         case wrongSize(path: String, expected: Int64, received: Int64)
         /// What arrived was the right length and the wrong bytes.
         case wrongContents(path: String)
-        /// The repository listed none of the Engine's files, so the names Cheppu
+        /// The repository listed none of the part's files, so the names Cheppu
         /// asks for and the names it publishes have drifted apart.
         case engineNotInRepository
         /// A path the repository listed cannot be turned into an address.
@@ -63,6 +63,14 @@ struct EngineDownload {
     /// thing holding the download up.
     var reportEvery: Int64 = 1_000_000
 
+    /// Which part of the Engine is being assembled here.
+    ///
+    /// The Engine is in two parts and this file fetches either of them: the
+    /// listing, the resume, the size check, the digest and the manifest are the
+    /// same work whichever it is, and the only difference is which repository
+    /// is asked and which of its files are wanted (ADR-0014).
+    var part: EnginePart = .everyDictationNeedsIt
+
     /// The revision fetched. `main` rather than a pinned commit: the Engine's
     /// publisher reissues these bundles to fix conversion bugs, and a pin would
     /// hold Cheppu on a known-worse Engine until someone edited a constant.
@@ -88,7 +96,7 @@ struct EngineDownload {
         let files =
             try JSONDecoder()
             .decode([TreeEntry].self, from: data)
-            .filter { $0.type == "file" && EngineFiles.isEngineFile($0.path) }
+            .filter { $0.type == "file" && part.isPartOfIt($0.path) }
             .map { RemoteFile(path: $0.path, bytes: $0.size ?? 0, digest: $0.lfs?.oid) }
             .sorted { $0.path < $1.path }
 
@@ -255,7 +263,7 @@ struct EngineDownload {
         return size.int64Value
     }
 
-    private var repository: String { EngineFiles.repository.remotePath }
+    private var repository: String { part.repository.remotePath }
 
     private func encoded(_ path: String) -> String {
         path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path

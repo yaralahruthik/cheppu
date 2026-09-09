@@ -10,6 +10,18 @@ enum EngineFiles {
     /// The Hugging Face repository holding Parakeet TDT v3 compiled for CoreML.
     static let repository = Repo.parakeetV3
 
+    /// The repository holding the second part of the Engine: the small CTC
+    /// model that hears the audio again and finds where a Spelling was said.
+    ///
+    /// A second repository rather than more of the first, because it is a
+    /// different model published in a different place — and because it is
+    /// fetched at a different moment, by a user who has made a Correction
+    /// (ADR-0014).
+    static let spellingsRepository = Repo.parakeetCtc110m
+
+    /// Which CTC model the second part is, in FluidAudio's own vocabulary.
+    static let spellingsVariant = CtcModelVariant.ctc110m
+
     /// The version FluidAudio is asked to load, and the one whose file names the
     /// download is built from.
     static let version = AsrModelVersion.v3
@@ -24,6 +36,32 @@ enum EngineFiles {
 
     /// The token table, a plain file at the repository root.
     static let vocabulary = ModelNames.ASR.vocabularyFile
+
+    /// What the second part is made of: two CoreML bundles, the token table the
+    /// spotter scores against, and the tokenizer that turns a Spelling into the
+    /// tokens to score.
+    ///
+    /// The tokenizer is here because `VocabularyRescorer` loads one and cannot
+    /// be given the terms already tokenised. Without it the second pass would
+    /// have to tokenise by downloading on its own, which is the one thing
+    /// `ModelHub.offlineMode` exists to make impossible.
+    static let spellingsBundles = ModelNames.CTC.requiredModels
+
+    /// The CTC token table, a plain file at that repository's root.
+    static let spellingsVocabulary = ModelNames.CTC.vocabularyPath
+
+    /// The tokenizer FluidAudio reads a Spelling with, beside it.
+    static let spellingsTokenizer = "tokenizer.json"
+
+    /// Whether a path inside the CTC repository is part of what Spellings need.
+    ///
+    /// That repository also carries the CTC head, the `.mlpackage` sources and
+    /// the conversion scripts — none of which the rescorer opens, and all of
+    /// which would be bytes the user waits for and never uses.
+    static func isSpellingsFile(_ path: String) -> Bool {
+        if path == spellingsVocabulary || path == spellingsTokenizer { return true }
+        return spellingsBundles.contains { path.hasPrefix($0 + "/") }
+    }
 
     /// Whether a path inside the repository is part of the Engine.
     ///
@@ -53,6 +91,27 @@ enum EngineFiles {
             .appendingPathComponent(repository.folderName, isDirectory: true)
     }
 
+    /// Where the second part lives: `Cheppu/Engine/<repository folder>` inside
+    /// Application Support, beside the first.
+    ///
+    /// The same folder as everything else Cheppu put on the machine, so that
+    /// what the user deletes when they are done with Cheppu is still one drag
+    /// (ADR-0009).
+    static func spellingsDirectory(inApplicationSupport applicationSupport: URL) -> URL {
+        spellingsDirectory(besideTheFirstPartAt: directory(inApplicationSupport: applicationSupport))
+    }
+
+    /// The same place, worked out from wherever the first part is.
+    ///
+    /// Said once rather than twice: "beside the first part" is the whole of
+    /// where the second one goes, and a suite that puts the first somewhere of
+    /// its own gets the second in the same folder without being told.
+    static func spellingsDirectory(besideTheFirstPartAt firstPart: URL) -> URL {
+        firstPart
+            .deletingLastPathComponent()
+            .appendingPathComponent(spellingsRepository.folderName, isDirectory: true)
+    }
+
     /// `~/Library/Application Support`, or a throw if this account has no such
     /// place — which would mean the Engine has nowhere to live.
     static func defaultApplicationSupport() throws -> URL {
@@ -63,4 +122,26 @@ enum EngineFiles {
             create: true
         )
     }
+}
+
+
+/// One of the two parts the Engine is in: where it is published, and which of
+/// the files published there Cheppu actually runs.
+///
+/// A value rather than two copies of the download, because everything the
+/// download does — the listing, the resume, the size check, the digest, the
+/// manifest — is the same for both, and the only difference between them is
+/// which repository is asked and which of its files are wanted (ADR-0014).
+struct EnginePart: Sendable {
+    let repository: Repo
+    let isPartOfIt: @Sendable (String) -> Bool
+
+    /// What every Dictation needs: Parakeet TDT v3, fetched at Onboarding.
+    static let everyDictationNeedsIt = EnginePart(
+        repository: EngineFiles.repository, isPartOfIt: EngineFiles.isEngineFile)
+
+    /// What only Spellings need, offered at the first Correction and never
+    /// before.
+    static let onlySpellingsNeedIt = EnginePart(
+        repository: EngineFiles.spellingsRepository, isPartOfIt: EngineFiles.isSpellingsFile)
 }

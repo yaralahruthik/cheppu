@@ -15,7 +15,8 @@ struct SettingsScreenTests {
         launchesAtLogin: Bool = false,
         permissions: [Permission: PermissionStatus] = [
             .microphone: .granted, .accessibility: .granted,
-        ]
+        ],
+        spellings: SpellingsRow = .theEngineCanReadThem(areOn: true, howMany: 0)
     ) -> SettingsScreen {
         SettingsScreen(
             hotkey: hotkey,
@@ -23,7 +24,8 @@ struct SettingsScreenTests {
             cleanup: cleanup,
             areCuesOn: areCuesOn,
             launchesAtLogin: launchesAtLogin,
-            permissions: permissions
+            permissions: permissions,
+            spellings: spellings
         )
     }
 
@@ -39,9 +41,10 @@ struct SettingsScreenTests {
     func everythingTheUserCanSetIsOnTheOneScreen() {
         // The whole of `docs/product-experience.md` §11: the Hotkey, three
         // Cleanup switches, the Cues, launch at login, the permissions this
-        // Hotkey needs, and History. Written out here rather than counted,
-        // because a setting that quietly stopped being shown is a setting the
-        // user has to go looking for in a menu that does not have it either.
+        // Hotkey needs, History, and the Spellings a Correction leaves behind.
+        // Written out here rather than counted, because a setting that quietly
+        // stopped being shown is a setting the user has to go looking for in a
+        // menu that does not have it either.
         #expect(
             Self.screen(cleanup: .all, areCuesOn: true, launchesAtLogin: true).controls == [
                 .hotkey(.byDefault, isBeingChosen: false),
@@ -53,8 +56,71 @@ struct SettingsScreenTests {
                 .permission(.microphone, .granted),
                 .permission(.accessibility, .granted),
                 .history,
+                .spellings(.theEngineCanReadThem(areOn: true, howMany: 0)),
             ]
         )
+    }
+
+    @Test("The Spellings row is a switch, a count and one action")
+    func theSpellingsRowIsASwitchACountAndOneAction() {
+        let row = SpellingsRow.theEngineCanReadThem(areOn: true, howMany: 3)
+        let control = SettingsControl.spellings(row)
+
+        #expect(Self.screen(spellings: row).controls.contains(control))
+        #expect(control.isOn == true)
+        #expect(control.explanation?.contains("3 words") == true)
+        // Emptying History leaves the Spellings, and this leaves History: two
+        // things the user holds, two actions (ADR-0014).
+        #expect(control.action == "Forget All")
+    }
+
+    @Test("Nothing taught yet is a row with nothing to forget")
+    func nothingTaughtYetIsARowWithNothingToForget() {
+        // The row is still on the screen: it is where a user finds out that
+        // correcting a word in History is a thing Cheppu does anything with.
+        #expect(
+            SettingsControl.spellings(.theEngineCanReadThem(areOn: true, howMany: 0)).action
+                == nil)
+    }
+
+    @Test("A missing part of the Engine is said, with its size, and offered")
+    func aMissingPartOfTheEngineIsSaidWithItsSizeAndOffered() {
+        let control = SettingsControl.spellings(.thePartIsMissing)
+
+        // What it costs, said at the moment it is offered and never before
+        // (ADR-0014).
+        #expect(control.explanation?.contains(SpellingsPartOfTheEngine.howBigItIs) == true)
+        #expect(control.action == "Download")
+        // Nothing to switch: a part that is not here is a thing to read and a
+        // button to press.
+        #expect(control.isOn == nil)
+    }
+
+    @Test("The History window shows the section for a fetch, and for nothing else")
+    func theHistoryWindowShowsTheSectionForAFetchAndForNothingElse() {
+        // With nothing taught, the section is worth a place of its own only
+        // while a download the user started is running. A part that is merely
+        // missing is not: the offer is made at the first Correction and never
+        // before, and before that there is nothing for the part to read
+        // (ADR-0014).
+        #expect(
+            SpellingsRow.thePartIsArriving(
+                EngineDownloadProgress(downloadedBytes: 1, totalBytes: 2)
+            ).isWorthShowingOnItsOwn)
+        #expect(SpellingsRow.thePartIsMissing.isWorthShowingOnItsOwn == false)
+        #expect(
+            SpellingsRow.theEngineCanReadThem(areOn: true, howMany: 0).isWorthShowingOnItsOwn
+                == false)
+    }
+
+    @Test("A fetch under way is said, and offers nothing to press")
+    func aFetchUnderWayIsSaidAndOffersNothingToPress() {
+        let arriving = SettingsControl.spellings(
+            .thePartIsArriving(
+                EngineDownloadProgress(downloadedBytes: 50_000_000, totalBytes: 100_000_000)))
+
+        #expect(arriving.explanation?.contains("50 MB of 100 MB") == true)
+        #expect(arriving.action == nil)
     }
 
     @Test("Every Cleanup rule has a switch of its own")
@@ -210,7 +276,7 @@ struct SettingsScreenTests {
 
         #expect(
             screen.sections.map(\.title) == [
-                "Hotkey", "Cleanup", "Sounds", "Startup", "Permissions", "History",
+                "Hotkey", "Cleanup", "Sounds", "Startup", "Permissions", "History", "Spellings",
             ]
         )
         #expect(screen.sections.allSatisfy { !$0.controls.isEmpty })

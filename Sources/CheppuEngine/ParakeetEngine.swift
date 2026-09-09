@@ -27,22 +27,82 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
     private let directory: URL
     private let configuration: URLSessionConfiguration
 
+    /// Where the second part of the Engine is, and the second time the audio is
+    /// heard through it — where there is a Spelling to listen for and that part
+    /// is on the machine.
+    private let spellingsDirectory: URL
+    private let spellingsPass: SpellingsPass
+
+    /// What the user has taught Cheppu, and whether Cheppu is listening for it.
+    ///
+    /// Both read at the Dictation rather than held from launch, exactly as the
+    /// Cleanup switches are (ADR-0010): a Spelling left behind a moment ago is
+    /// read by the very next thing the user says.
+    ///
+    /// Nothing on a machine that has never had a Correction on it, which is
+    /// what makes the stop-to-insert path of a user who never corrects
+    /// unchanged: with no Spellings there is no second pass to skip, and the
+    /// question costs one read of a file the store already has in hand.
+    private let spellings: (any SpellingsPort)?
+    private let switchedOn: (any SpellingsSwitch)?
+
+    /// Where how long the second pass took is written down. Told rather than
+    /// asked, like every other note.
+    private let diagnostics: (any DiagnosticsPort)?
+
     private var manager: AsrManager?
 
     /// The Engine, reading and writing its files under Application Support.
-    public init() throws {
+    ///
+    /// - Parameters:
+    ///   - spellings: what the user has taught Cheppu. Nothing means an Engine
+    ///     that never hears anything twice, which is what the suites and the
+    ///     Accuracy Corpus use: both Ceilings measure the bare Engine, and a
+    ///     Spelling that made the Corpus score better would be a test that had
+    ///     stopped measuring the Engine (ADR-0014).
+    ///   - switchedOn: whether Spellings are read at all.
+    ///   - diagnostics: where how long the second pass took is written down.
+    public init(
+        readingSpellings spellings: (any SpellingsPort)? = nil,
+        when switchedOn: (any SpellingsSwitch)? = nil,
+        writingDownTo diagnostics: (any DiagnosticsPort)? = nil
+    ) throws {
+        let applicationSupport = try EngineFiles.defaultApplicationSupport()
         self.init(
-            directory: EngineFiles.directory(
-                inApplicationSupport: try EngineFiles.defaultApplicationSupport()),
-            configuration: .ephemeral
+            directory: EngineFiles.directory(inApplicationSupport: applicationSupport),
+            spellingsDirectory: EngineFiles.spellingsDirectory(
+                inApplicationSupport: applicationSupport),
+            configuration: .ephemeral,
+            readingSpellings: spellings,
+            when: switchedOn,
+            writingDownTo: diagnostics
         )
     }
 
     /// The seam the suite uses: a directory that is not the user's, and a session
     /// that is not the network.
-    init(directory: URL, configuration: URLSessionConfiguration) {
+    ///
+    /// - Parameter spellingsDirectory: where the second part of the Engine
+    ///   lives. Beside the first by default, which is where it lives on a real
+    ///   machine; passed separately by a suite whose first part is in a
+    ///   temporary directory of its own.
+    init(
+        directory: URL,
+        spellingsDirectory: URL? = nil,
+        configuration: URLSessionConfiguration,
+        readingSpellings spellings: (any SpellingsPort)? = nil,
+        when switchedOn: (any SpellingsSwitch)? = nil,
+        writingDownTo diagnostics: (any DiagnosticsPort)? = nil
+    ) {
         self.directory = directory
         self.configuration = configuration
+        self.spellings = spellings
+        self.switchedOn = switchedOn
+        self.diagnostics = diagnostics
+        let secondPart =
+            spellingsDirectory ?? EngineFiles.spellingsDirectory(besideTheFirstPartAt: directory)
+        self.spellingsDirectory = secondPart
+        self.spellingsPass = SpellingsPass(directory: secondPart)
 
         // FluidAudio will fetch a missing or corrupt model on its own unless it
         // is told not to. Cheppu's promise is that the Engine Download is the
@@ -54,6 +114,13 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
 
     private var download: EngineDownload {
         EngineDownload(directory: directory, configuration: configuration)
+    }
+
+    private var spellingsDownload: EngineDownload {
+        EngineDownload(
+            directory: spellingsDirectory,
+            configuration: configuration,
+            part: .onlySpellingsNeedIt)
     }
 
     // MARK: - Putting the Engine on the machine
@@ -71,6 +138,16 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
         reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
     ) async throws {
         try await download.run(reporting: progress)
+    }
+
+    public func isTheSpellingsPartDownloaded() async -> Bool {
+        spellingsPass.isOnTheMachine()
+    }
+
+    public func downloadTheSpellingsPart(
+        reporting progress: @escaping @Sendable (EngineDownloadProgress) -> Void
+    ) async throws {
+        try await spellingsDownload.run(reporting: progress)
     }
 
     // MARK: - Asking it what was said
@@ -93,7 +170,38 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
         let heard = try await manager.transcribe(
             samples, decoderState: &decoderState, language: .english)
 
-        return RawTranscript(text: heard.text, words: Self.wordTimings(of: heard))
+        let words = Self.wordTimings(of: heard)
+        guard let spelt = await readingSpellings(into: heard, over: samples) else {
+            return RawTranscript(text: heard.text, words: words)
+        }
+        return RawTranscript(
+            text: spelt, words: Self.wordTimings(words, nowReading: heard.text, as: spelt))
+    }
+
+    /// The transcript with the user's Spellings put in where the sound supports
+    /// them, or nothing where there was no second pass to run.
+    ///
+    /// Nothing is the ordinary answer. The pass runs only where the user has
+    /// left a Spelling behind, has the switch on, and has the part of the
+    /// Engine that can hear one — so the stop-to-insert path of a user who
+    /// never corrects is exactly what it was, and the question costs the
+    /// Dictation two reads of things already in hand (ADR-0014).
+    private func readingSpellings(into heard: ASRResult, over samples: [Float]) async -> String? {
+        guard let spellings, await switchedOn?.areSpellingsRead() ?? true else { return nil }
+
+        let taught = await spellings.spellings()
+        guard !taught.isEmpty, spellingsPass.isOnTheMachine() else { return nil }
+
+        // Timed rather than left to the gap between two lines: the pass happens
+        // inside one move from Transcribing to Inserting, so a stop-to-insert
+        // budget that has been missed would otherwise say only that the Engine
+        // was slow (ADR-0012, ADR-0014).
+        let started = ContinuousClock.now
+        let spelt = await spellingsPass.rescoring(
+            heard.text, tokenTimings: heard.tokenTimings ?? [], audio: samples, against: taught)
+        diagnostics?.record(.spellingsWereRead(ContinuousClock.now - started))
+
+        return spelt
     }
 
     /// The per-word timings Cleanup will need, from the per-token timings the
@@ -111,6 +219,46 @@ public actor ParakeetEngine: EnginePort, EngineDownloadPort {
                 end: .seconds(timing.endTime)
             )
         }
+    }
+
+    /// The word timings, moved onto the words a Spelling changed.
+    ///
+    /// Cleanup places a Paragraph Break between two particular words, and takes
+    /// the timings up only where its own reading of the text and the Engine's
+    /// list of words line up one for one. A Spelling put into the text and not
+    /// into the timings would break that line-up and cost the user every
+    /// Paragraph Break in the Dictation — for the sake of one word being spelt
+    /// right, which is not a trade worth making.
+    ///
+    /// Each replaced word takes the time of the words it replaced, which is
+    /// where it was said. Where the two do not line up to begin with there is
+    /// nothing to move: the timings are handed back untouched, and Cleanup goes
+    /// on placing no Paragraph Break, exactly as it would have without a
+    /// Spelling.
+    private static func wordTimings(
+        _ timings: [CheppuCore.WordTiming], nowReading was: String, as now: String
+    ) -> [CheppuCore.WordTiming] {
+        let before = ChangedSpans.words(in: was)
+        let after = ChangedSpans.words(in: now)
+        guard before.count == timings.count else { return timings }
+
+        var moved: [CheppuCore.WordTiming] = []
+        var taken = 0
+
+        for span in ChangedSpans.between(before, and: after) {
+            moved += timings[taken..<span.was.lowerBound]
+            taken = span.was.upperBound
+
+            // Where the span replaced nothing there is no time it was said at,
+            // so it is given the instant the words around it meet.
+            let at = timings[span.was].first?.start ?? moved.last?.end ?? .zero
+            let until = timings[span.was].last?.end ?? at
+            moved += after[span.now].map {
+                CheppuCore.WordTiming(word: $0, start: at, end: until)
+            }
+        }
+
+        return moved + timings[taken...]
     }
 
     /// What Parakeet hears in.

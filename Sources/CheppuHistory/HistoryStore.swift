@@ -66,6 +66,26 @@ public actor HistoryStore: HistoryPort {
         readIfNeeded()
     }
 
+    /// Takes a Correction: the entry keeps the words the user typed and the
+    /// timestamp it already had.
+    ///
+    /// The store writes and hands back what History now holds. What the change
+    /// teaches is `Correction`'s, and where a Spelling is kept is
+    /// `SpellingsStore`'s: this is the one part that is History's, and it is
+    /// the only part that touches this file.
+    ///
+    /// Nothing is inserted and the clipboard is not touched. The words are
+    /// already where they went.
+    @discardableResult
+    public func correct(_ entry: HistoryEntry, to finalText: FinalText) async throws -> History {
+        let corrected = readIfNeeded().correcting(entry, to: finalText)
+        guard corrected != history else { return corrected }
+
+        try write(corrected)
+        history = corrected
+        return corrected
+    }
+
     /// Empties the whole store, in one action.
     ///
     /// The file is removed rather than emptied: what the user asked for is that

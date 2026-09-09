@@ -75,6 +75,22 @@ struct PreferencesTests {
             // they get without choosing.
             #expect(preferences.rules() == .all)
             #expect(preferences.areCuesOn())
+            // On, and free: there is nothing to read and no second pass to run
+            // until the user has corrected a word (ADR-0014).
+            #expect(preferences.areSpellingsRead())
+        }
+    }
+
+    @Test("Turning Spellings off keeps them and stops reading them")
+    func turningSpellingsOffKeepsThemAndStopsReadingThem() {
+        Self.inADomainOfItsOwn { preferences, defaults in
+            preferences.turnSpellings(on: false)
+
+            #expect(preferences.areSpellingsRead() == false)
+            // Nothing here forgets a Spelling. Off is one flick, and the flick
+            // back is the other; forgetting them is the store's, on a button of
+            // its own (ADR-0014).
+            #expect(Preferences(in: defaults).areSpellingsRead() == false)
         }
     }
 

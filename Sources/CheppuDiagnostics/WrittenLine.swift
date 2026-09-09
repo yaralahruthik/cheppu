@@ -64,6 +64,8 @@ struct WrittenLine: Equatable {
             "a Dictation ended: \(failure)"
         case .permissionMissing(let permission):
             "macOS is not granting \(permission.name)"
+        case .spellingsWereRead(let took):
+            "the Spellings were read in \(seconds(of: took))"
         case .notesWereDropped(let howMany):
             "\(howMany) notes were dropped: the disk was not keeping up"
         case .watchingForTheHotkey:
@@ -71,6 +73,15 @@ struct WrittenLine: Equatable {
         case .theHotkeyCouldNotBeWatched(let failure):
             "the Hotkey cannot be watched: \(failure)"
         }
+    }
+
+    /// A span, in the seconds and milliseconds the gaps between lines are
+    /// written in, so that the one measured timing in the file reads the same
+    /// as every timing worked out from two of them.
+    private static func seconds(of span: Duration) -> String {
+        let whole = Double(span.components.seconds)
+        let rest = Double(span.components.attoseconds) / 1e18
+        return gap(of: whole + rest)
     }
 
     private static func name(of state: DictationState) -> String {

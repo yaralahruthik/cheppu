@@ -37,4 +37,26 @@ public struct History: Equatable, Sendable {
     public func appending(_ entry: HistoryEntry) -> History {
         History([entry] + entries)
     }
+
+    /// The same History with one Dictation now saying what the user corrected
+    /// it to.
+    ///
+    /// The entry keeps its place and its timestamp. A Correction is the user
+    /// telling Cheppu it misheard them, not a new Dictation: moving the row to
+    /// the top would be History reordering itself around an edit, and the thing
+    /// they are looking for is still the thing they said at that time
+    /// (ADR-0014).
+    ///
+    /// A Dictation that is no longer here — the window was open while a hundred
+    /// more were made — is a Correction that changes nothing rather than one
+    /// that puts it back. What the user was looking at is gone, and re-adding
+    /// it would be History growing by something the capacity had already
+    /// dropped.
+    public func correcting(_ entry: HistoryEntry, to finalText: FinalText) -> History {
+        guard let index = entries.firstIndex(of: entry) else { return self }
+
+        var corrected = entries
+        corrected[index] = HistoryEntry(finalText: finalText, recordedAt: entry.recordedAt)
+        return History(corrected)
+    }
 }

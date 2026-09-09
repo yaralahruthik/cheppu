@@ -121,6 +121,105 @@ struct EngineDownloadTests {
         #expect(scenario.onDisk("README.md") == nil)
     }
 
+    @Test("Nothing the Engine does not open is fetched")
+    func nothingTheEngineDoesNotOpenIsFetchedFromTheSecondRepository() async throws {
+        let scenario = SecondPart()
+        defer { scenario.cleanUp() }
+
+        try await scenario.download().run { _ in }
+
+        // The whole of what the rescorer opens, and nothing else: the CTC head,
+        // the `.mlpackage` sources and the conversion scripts are bytes the
+        // user would wait for and never use (ADR-0014).
+        for wanted in [
+            "MelSpectrogram.mlmodelc/model.mil", "AudioEncoder.mlmodelc/model.mil",
+            "vocab.json", "tokenizer.json",
+        ] {
+            #expect(scenario.onDisk(wanted) != nil, "\(wanted) was not fetched")
+        }
+        #expect(scenario.onDisk("CtcHead.mlmodelc/model.mil") == nil)
+        #expect(scenario.onDisk("CtcHead.mlpackage/Manifest.json") == nil)
+        #expect(scenario.onDisk("convert/parakeet-tdt-ctc-110m/coreml/convert-parakeet.py") == nil)
+        #expect(scenario.onDisk("README.md") == nil)
+    }
+
+    @Test("The second part is asked of the repository that publishes it")
+    func theSecondPartIsAskedOfTheRepositoryThatPublishesIt() async throws {
+        let scenario = SecondPart()
+        defer { scenario.cleanUp() }
+
+        try await scenario.download().run { _ in }
+
+        // A second repository rather than more of the first. The Engine is in
+        // two parts and this is the one only Spellings need.
+        #expect(EngineFiles.spellingsRepository != EngineFiles.repository)
+        #expect(EngineDownload.isEngineComplete(in: scenario.directory))
+    }
+
+    @Test("A stopped fetch of the second part resumes where it stopped")
+    func aStoppedFetchOfTheSecondPartResumesWhereItStopped() async throws {
+        let scenario = SecondPart()
+        defer { scenario.cleanUp() }
+
+        // The connection ends partway through every body, the way a laptop
+        // closing does.
+        scenario.repository.truncatesAfter = 16
+        try? await scenario.download().run { _ in }
+        #expect(EngineDownload.isEngineComplete(in: scenario.directory) == false)
+
+        scenario.repository.truncatesAfter = nil
+        try await scenario.download().run { _ in }
+
+        #expect(EngineDownload.isEngineComplete(in: scenario.directory))
+        // Asked for from the byte it stopped at rather than from nothing: the
+        // resume is the same resume the first part gets.
+        #expect(scenario.repository.everythingAsked.contains { $0.range == "bytes=16-" })
+    }
+
+    /// The second part of the Engine, in a repository of its own that answers
+    /// from memory: the two CoreML bundles the rescorer runs, the token table
+    /// it scores against, the tokenizer that reads it, and everything else the
+    /// repository carries that Cheppu never opens.
+    private struct SecondPart {
+        let repository = FakeRepository()
+        let directory: URL
+
+        init() {
+            directory = FileManager.default.temporaryDirectory
+                .appending(path: "cheppu-spellings-part-\(UUID().uuidString)")
+
+            for bundle in EngineFiles.spellingsBundles.sorted() {
+                repository.publish("\(bundle)/coremldata.bin", bytes: 64)
+                repository.publish("\(bundle)/model.mil", bytes: 4_096)
+            }
+            repository.publish(EngineFiles.spellingsVocabulary, bytes: 512)
+            repository.publish(EngineFiles.spellingsTokenizer, bytes: 2_048)
+
+            repository.publish("CtcHead.mlmodelc/model.mil", bytes: 4_096)
+            repository.publish("CtcHead.mlpackage/Manifest.json", bytes: 512)
+            repository.publish(
+                "convert/parakeet-tdt-ctc-110m/coreml/convert-parakeet.py", bytes: 1_000)
+            repository.publish("README.md", bytes: 1_000)
+        }
+
+        func download() -> EngineDownload {
+            EngineDownload(
+                directory: directory,
+                configuration: repository.configuration,
+                host: repository.host,
+                part: .onlySpellingsNeedIt
+            )
+        }
+
+        func onDisk(_ path: String) -> Data? {
+            try? Data(contentsOf: directory.appending(path: path))
+        }
+
+        func cleanUp() {
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
     @Test("Progress runs from nothing to the whole Engine")
     func progressRunsFromNothingToTheWholeEngine() async throws {
         let scenario = Scenario()
