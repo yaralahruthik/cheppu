@@ -1,0 +1,22 @@
+docs/adr/0014-spellings-bias-the-engine-and-are-paid-for-at-the-first-correction.md
+  s_3e5b75f845a4a5::t_239e2849b669b8 1-29
+CONTEXT.md
+  s_3e5b75f845a4a5::t_55ed1d58be81a3 123,125-127,129-130
+  s_3e5b75f845a4a5::t_fcaed474542e29 42,46-47,120,124,128,136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "6c9de6b50188c4c1c31d3eb878769c2febfa4a05",
+  "prompts": {},
+  "sessions": {
+    "s_3e5b75f845a4a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45c5931c-5efa-46b1-b61d-9b9c17b3bb47",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "yaralahruthik <yaralahruthikreddy@gmail.com>"
+    }
+  }
+}
